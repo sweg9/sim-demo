@@ -1,0 +1,19 @@
+# Unity generated
+/Library/
+/Temp/
+/Logs/
+/UserSettings/
+/Builds/
+/obj/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+*.csproj
+*.sln
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Blender backups
+*.blend1
