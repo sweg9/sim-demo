@@ -6,12 +6,12 @@ using UnityEngine;
 
 /// <summary>
 /// Runs the seven-stage process end to end: S1 recognize, S2 map and verify, S3 routine, S4 trigger and intent,
-/// S5 wireless + CV check, S6 physical fallback, S7 learning. Also does the per-frame perception of the wall controls.
+/// S5 wireless (reported state, CV check for IR), S6 physical fallback, S7 learning. Also does the per-frame perception of the wall controls.
 /// </summary>
 public class DemoDirector : MonoBehaviour
 {
     public static readonly string[] StageName =
-        { "Recognize", "Map & verify", "Routine", "Trigger & intent", "Wireless + CV", "Physical fallback", "Learn" };
+        { "Recognize", "Map & verify", "Routine", "Trigger & intent", "Wireless control", "Physical fallback", "Learn" };
 
     public static readonly Color Cyan = new Color(0.30f, 0.86f, 1f);
     public static readonly Color Blue = new Color(0.42f, 0.66f, 1f);
@@ -733,7 +733,7 @@ public class DemoDirector : MonoBehaviour
             yield break;
         }
         SetStage(4);
-        Say("S5 · Wireless control and CV check", cp.lampName + " " + verb);
+        Say("S5 · Wireless control", cp.lampName + " " + verb);
         robot.SetMood(Amber, 0.5f);
         var plan = Plan(cp);
         var sb = new List<string>();
@@ -759,8 +759,16 @@ public class DemoDirector : MonoBehaviour
             if (ch.fails)
             {
                 wirelessFail++;
-                Log("S5", ch.name + ": no acknowledgement, CV delta-L +0.01 -> state unchanged", Red);
-                ToastMsg(ch.name + " failed", "No state change detected by CV", Red, 2.8f);
+                if (ch.kind == 'i')
+                {
+                    Log("S5", "IR: no response, CV delta-L +0.01 -> state unchanged", Red);
+                    ToastMsg("IR failed", "No state change detected by CV", Red, 2.8f);
+                }
+                else
+                {
+                    Log("S5", ch.name + ": device reported an error, state unchanged", Red);
+                    ToastMsg(ch.name + " failed", "Device reported an error", Red, 2.8f);
+                }
                 Sfx.Play("fail");
                 Learn(cp, ch, false);
                 yield return W(0.9f);
@@ -768,7 +776,10 @@ public class DemoDirector : MonoBehaviour
             }
             cp.SetOn(on, false);
             yield return W(1.0f);
-            Log("S5", "CV state check: delta-L " + (on ? "+0.42" : "-0.42") + " -> " + cp.lampName + " " + verb + " confirmed", Green);
+            if (ch.kind == 'i')
+                Log("S5", "CV state check: delta-L " + (on ? "+0.42" : "-0.42") + " -> " + cp.lampName + " " + verb + " confirmed", Green);
+            else
+                Log("S5", ch.name + ": device reports " + (on ? "ON" : "OFF") + " -> " + cp.lampName + " " + verb + " confirmed", Green);
             ToastMsg(cp.lampName + " " + verb, "Done via " + ch.name, Green);
             Sfx.Play("ok");
             wirelessOk++;
