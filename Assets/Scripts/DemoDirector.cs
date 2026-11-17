@@ -926,6 +926,18 @@ public class DemoDirector : MonoBehaviour
         cam.SetMode(CamMode.Chase);
         yield return robot.GoTo(pos);
         pathLine.enabled = false;
+        Vector3 miss = robot.transform.position - pos; miss.y = 0;
+        if (miss.magnitude > 0.35f)
+        {
+            // blocked on the way: do not press from a wrong spot (C-09), end the run as a failure
+            Log("S6", "Could not reach the press spot for " + cp.id + " (" + miss.magnitude.ToString("0.00") + " m off, path blocked). Result: failure, resident notified", Red);
+            ToastMsg(cp.lampName + " not switched", "Press spot blocked. Resident notified.", Red, 4f);
+            Sfx.Play("fail");
+            Learn(cp, null, false);
+            robot.SetMood(Red, 0.6f);
+            yield return W(1.6f);
+            yield break;
+        }
         yield return robot.TurnTo(yaw);
         robot.LookAt(cp.Surface);
         float wait = 0;

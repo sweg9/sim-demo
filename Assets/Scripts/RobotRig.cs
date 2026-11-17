@@ -667,7 +667,7 @@ public class RobotRig : MonoBehaviour
             {
                 Vector3 wp = path[i];
                 bool last = i == path.Count - 1;
-                float stall = 0;
+                float stall = 0, onWp = 0;
                 while (true)
                 {
                     if (cancel != null && cancel()) { Drive(0, 0); busy = false; yield break; }
@@ -683,7 +683,9 @@ public class RobotRig : MonoBehaviour
                     float v = Mathf.Min(vmax, Mathf.Max(0.18f, vBrake)) * (Mathf.Abs(err) > 55f ? 0f : align);
                     Drive(v / maxSpeed, turn / maxTurn);
                     stall = speed < 0.05f && Mathf.Abs(err) < 20f ? stall + Time.deltaTime : 0f;
-                    if (stall > 0.8f) { stuck = true; break; }
+                    onWp += Time.deltaTime;
+                    // blocked while facing the waypoint, or circling it without arriving
+                    if (stall > 0.8f || onWp > 5f) { stuck = true; break; }
                     yield return null;
                 }
             }
@@ -701,8 +703,10 @@ public class RobotRig : MonoBehaviour
     public IEnumerator TurnTo(float yaw, Func<bool> cancel = null)
     {
         busy = true;
-        while (true)
+        float t = 0;
+        while (t < 4f)                      // never spin forever
         {
+            t += Time.deltaTime;
             if (cancel != null && cancel()) break;
             float err = Mathf.DeltaAngle(transform.eulerAngles.y, yaw);
             if (Mathf.Abs(err) < 1.5f && Mathf.Abs(yawRate) < 12f) break;
