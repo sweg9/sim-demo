@@ -44,6 +44,7 @@ public class Bootstrap : MonoBehaviour
         PathGrid.Build(-0.4f, -0.4f, 13.4f, 9.4f, 0.1f, 0.40f);
 
         robot = new GameObject("CLOiD").AddComponent<RobotRig>();
+        robot.model = RobotRig.ChosenModel();
         robot.Build();
         robot.Teleport(house.dockPos + new Vector3(0, 0, 0.06f), 0f);
 
@@ -163,6 +164,24 @@ public class Bootstrap : MonoBehaviour
         viewTest = Flag("-viewtest");
         if (Flag("-autodemo")) { dir.introVisible = false; dir.StartAuto(); }
         if (viewTest) StartCoroutine(ViewTest());
+        if (Flag("-introshot") && shotDir != null) StartCoroutine(IntroShot());
+    }
+
+    // the start screen with each robot selected (used to review the chooser)
+    IEnumerator IntroShot()
+    {
+        var keep = robot.model;
+        Directory.CreateDirectory(shotDir);
+        foreach (var m in new[] { RobotModel.Cloid, RobotModel.Tracked })
+        {
+            dir.ChooseRobot(m);
+            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(Path.Combine(shotDir, "intro_" + m.ToString().ToLowerInvariant() + ".png"));
+            yield return new WaitForSeconds(0.4f);
+        }
+        dir.ChooseRobot(keep);
+        QuitApp();
     }
 
     // fixed vantage points used to review the house and the models

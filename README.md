@@ -1,6 +1,6 @@
 # sim-demo
 
-Unity simulator demo of a camera-and-arm home robot that recognizes wall switches and operates them as part of a proactive routine. It walks through the whole process, from detection to learning, in a modern house scene.
+Unity simulator demo of a camera-equipped home robot that recognizes wall switches and operates them as part of a proactive routine. It walks through the whole process, from detection to learning, in a modern house scene.
 
 ## Process
 
@@ -18,6 +18,7 @@ Unity simulator demo of a camera-and-arm home robot that recognizes wall switche
 
 - Unity 6000.5.4f1, built-in render pipeline, Mono
 - Open the project and press Play. The scene builds itself at runtime (`Assets/Scripts/Bootstrap.cs`).
+- Two robot models (`Assets/Scripts/RobotRig.cs`): **CLOiD** is the original life-like robot with two arms. **Robot arm demo** (`tracked`) is a tracked base with a vertical rail; a carriage on the rail holds the webcam and a piston actuator that presses straight ahead. The start screen asks which one to run (the choice is remembered); M returns to it. Player builds also take `-robot tracked|cloid`.
 - Editor menu `CLOiD > Setup project` regenerates materials and the scene.
 - Headless builds: `-executeMethod Setup.Build` (macOS) and `Setup.BuildWin` (Windows) write to `Builds/`.
 
@@ -32,6 +33,8 @@ Unity simulator demo of a camera-and-arm home robot that recognizes wall switche
 | H | Inject a hazard (a person near the switch) |
 | C / F / V | Cycle camera / overview / robot POV |
 | Q / E, right mouse | Orbit camera |
+| 1 / 2 (start screen) | Choose the robot: CLOiD or the robot arm demo |
+| M | Back to the start screen to choose the robot |
 | T | Reset the world |
 | Esc | Cancel the current mission |
 

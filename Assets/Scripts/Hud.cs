@@ -247,7 +247,7 @@ public class Hud : MonoBehaviour
         float x = 20, y = 18;
         RR(new Rect(x, y, 330, 52), Panel, 14); RRo(new Rect(x, y, 330, 52), Edge, 14);
         Fill(new Rect(x + 16, y + 14, 3, 24), DemoDirector.Cyan);
-        T(new Rect(x + 28, y + 6, 290, 26), "CLOiD", 22, Txt, TextAnchor.MiddleLeft, true);
+        T(new Rect(x + 28, y + 6, 290, 26), robot.Title, 22, Txt, TextAnchor.MiddleLeft, true);
         T(new Rect(x + 28, y + 28, 290, 20), "Legacy control integration demo", 12, Dim, TextAnchor.MiddleLeft);
         // buttons
         y += 62;
@@ -349,7 +349,7 @@ public class Hud : MonoBehaviour
 
     void FeedCard(Rect r)
     {
-        Card(r, "ROBOT CAM  ·  CLOiD-01", DemoDirector.Cyan);
+        Card(r, "ROBOT CAM  ·  " + robot.UnitId, DemoDirector.Cyan);
         Rect fr = new Rect(r.x + 10, r.y + 36, r.width - 20, 325);
         GUI.DrawTexture(fr, robot.feed, ScaleMode.StretchToFill, false);
         GUI.DrawTexture(fr, vignette, ScaleMode.StretchToFill, true);
@@ -579,7 +579,7 @@ public class Hud : MonoBehaviour
 
     void Hints()
     {
-        string s = "WASD drive / click floor to go    Shift boost    Right-drag orbit    Wheel zoom    C camera    SPACE auto demo    R routine    G goodnight    H hazard    T reset";
+        string s = "WASD / click to drive   Right-drag orbit   C camera   SPACE auto   R routine   G goodnight   H hazard   M robot   T reset";
         float cx = (W - 540 - 370) * 0.5f + 370;
         Rect r = new Rect(cx - 460, Hh - 50, 920, 24);
         T(r, s, 12, new Color(1, 1, 1, 0.55f), TextAnchor.MiddleCenter, true);
@@ -627,16 +627,48 @@ public class Hud : MonoBehaviour
         GUI.color = og;
     }
 
+    // start screen: choose the robot, then start the auto demo or drive manually
     void Intro()
     {
-        Fill(new Rect(0, 0, W, Hh), new Color(0.02f, 0.03f, 0.05f, 0.80f));
+        Fill(new Rect(0, 0, W, Hh), new Color(0.02f, 0.03f, 0.05f, 0.84f));
         float cx = W * 0.5f, cy = Hh * 0.5f;
-        T(new Rect(cx - 500, cy - 160, 1000, 40), "LG CLOiD  ·  SOFTWARE ENGINEERING PHASE 2", 16, DemoDirector.Cyan, TextAnchor.MiddleCenter, true);
-        T(new Rect(cx - 500, cy - 120, 1000, 90), "Bringing legacy controls\ninto proactive routines", 54, Txt, TextAnchor.MiddleCenter, true);
-        T(new Rect(cx - 480, cy + 30, 960, 60), "The robot finds wall switches with its vision module, maps them to lamps, and operates them when a routine fires.\nWireless first, physical fallback second. Seven stages, three phases.", 18, Dim, TextAnchor.MiddleCenter, false, true);
-        if (Btn(new Rect(cx - 190, cy + 120, 180, 48), "Start auto demo", DemoDirector.Cyan, true)) { d.introVisible = false; d.StartAuto(); }
-        if (Btn(new Rect(cx + 10, cy + 120, 180, 48), "Drive manually", DemoDirector.Mute)) d.introVisible = false;
-        T(new Rect(cx - 400, cy + 190, 800, 24), "SPACE auto demo     ENTER drive manually", 13, new Color(1, 1, 1, 0.5f), TextAnchor.MiddleCenter, true);
+        T(new Rect(cx - 500, cy - 300, 1000, 30), "LG CLOiD  ·  SOFTWARE ENGINEERING PHASE 2", 16, DemoDirector.Cyan, TextAnchor.MiddleCenter, true);
+        T(new Rect(cx - 600, cy - 268, 1200, 56), "Bringing legacy controls into proactive routines", 42, Txt, TextAnchor.MiddleCenter, true);
+        T(new Rect(cx - 480, cy - 206, 960, 26), "Choose the robot for this run. Both run the same seven stages; only the body and the way it presses differ.", 16, Dim, TextAnchor.MiddleCenter);
+
+        float cw = 420, ch = 250, gap = 28, top = cy - 160;
+        RobotCard(new Rect(cx - gap * 0.5f - cw, top, cw, ch), RobotModel.Cloid, "1",
+            new[] { "Two articulated arms with IK reach", "Round wheeled base, pan / tilt head camera", "The arm presses switches and turns dials" });
+        RobotCard(new Rect(cx + gap * 0.5f, top, cw, ch), RobotModel.Tracked, "2",
+            new[] { "Two tracks, one motor per track", "Carriage rides a vertical rail to switch height", "Piston rod extends straight ahead to press" });
+
+        float by = top + ch + 30;
+        if (Btn(new Rect(cx - 190, by, 180, 48), "Start auto demo", DemoDirector.Cyan, true)) { d.introVisible = false; d.StartAuto(); }
+        if (Btn(new Rect(cx + 10, by, 180, 48), "Drive manually", DemoDirector.Mute)) d.introVisible = false;
+        T(new Rect(cx - 400, by + 64, 800, 24), "1 / 2 choose robot     SPACE auto demo     ENTER drive manually     M back to this screen", 13, new Color(1, 1, 1, 0.5f), TextAnchor.MiddleCenter, true);
+    }
+
+    void RobotCard(Rect r, RobotModel m, string key, string[] lines)
+    {
+        bool sel = robot.model == m;
+        bool hover = r.Contains(Event.current.mousePosition);
+        Color acc = DemoDirector.Cyan;
+        RR(r, sel ? new Color(acc.r, acc.g, acc.b, 0.16f) : new Color(1, 1, 1, hover ? 0.08f : 0.04f), 18);
+        RRo(r, sel ? new Color(acc.r, acc.g, acc.b, 0.95f) : new Color(1, 1, 1, hover ? 0.35f : 0.18f), 18, sel ? 2f : 1f);
+        Rect kr = new Rect(r.x + 22, r.y + 22, 30, 30);
+        RR(kr, sel ? acc : new Color(1, 1, 1, 0.12f), 8);
+        T(kr, key, 15, sel ? new Color(0.02f, 0.05f, 0.1f) : Txt, TextAnchor.MiddleCenter, true);
+        T(new Rect(r.x + 64, r.y + 18, r.width - 90, 36), RobotRig.ModelName(m), 26, Txt, TextAnchor.MiddleLeft, true);
+        T(new Rect(r.x + 24, r.y + 62, r.width - 48, 22), RobotRig.ModelTagline(m), 14, sel ? acc : Dim, TextAnchor.MiddleLeft, true);
+        float y = r.y + 100;
+        foreach (var l in lines)
+        {
+            Fill(new Rect(r.x + 26, y + 9, 5, 5), sel ? acc : Dim);
+            T(new Rect(r.x + 40, y, r.width - 64, 24), l, 15, Txt, TextAnchor.MiddleLeft);
+            y += 30;
+        }
+        T(new Rect(r.x + 24, r.yMax - 40, r.width - 48, 22), sel ? "SELECTED" : "Click to select", 12, sel ? acc : new Color(1, 1, 1, 0.45f), TextAnchor.MiddleLeft, true);
+        if (!sel && GUI.Button(r, GUIContent.none, GUIStyle.none)) { Sfx.Play("ui"); d.ChooseRobot(m); }
     }
 
     void EndCard()

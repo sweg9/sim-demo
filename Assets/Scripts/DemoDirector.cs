@@ -106,6 +106,24 @@ public class DemoDirector : MonoBehaviour
         };
         robot.SetMood(Cyan, 0.25f);
         levelText = "--";
+        ApplyModelText();
+    }
+
+    /// <summary>Pick the robot model for the next run (chosen on the start screen). Rebuilds the body.</summary>
+    public bool ChooseRobot(RobotModel m)
+    {
+        if (missionRunning) return false;
+        if (robot.model != m && !robot.SetModel(m)) return false;
+        ApplyModelText();
+        return true;
+    }
+
+    void ApplyModelText()
+    {
+        bool arm = robot.model == RobotModel.Cloid;
+        probe[1].detail = arm ? "head pan / tilt, approach" : "camera pan / tilt, carriage height";
+        probe[3].detail = arm ? "arm reach + safe contact" : "rail + piston, safe contact";
+        safety[1].text = "No person inside the " + robot.ToolName + " zone";
     }
 
     LineRenderer MakeLine(string name, float w)
@@ -279,6 +297,11 @@ public class DemoDirector : MonoBehaviour
     void Update()
     {
         Time.timeScale = speed;
+        if (introVisible)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1) || Input.GetKeyDown(KeyCode.LeftArrow)) ChooseRobot(RobotModel.Cloid);
+            if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2) || Input.GetKeyDown(KeyCode.RightArrow)) ChooseRobot(RobotModel.Tracked);
+        }
         if (introVisible && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
         {
             introVisible = false;
@@ -294,6 +317,12 @@ public class DemoDirector : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F)) cam.SetMode(CamMode.Overview);
         if (Input.GetKeyDown(KeyCode.V)) cam.SetMode(CamMode.Pov);
         if (Input.GetKeyDown(KeyCode.T)) ResetWorld();
+        if (Input.GetKeyDown(KeyCode.M))
+        {
+            // back to the start screen to choose the robot
+            if (!missionRunning) { ResetWorld(); introVisible = true; }
+            else ToastMsg("Choose robot", "Finish or cancel the current mission first", Amber, 2.2f);
+        }
         if (proposal.open && Input.GetKeyDown(KeyCode.Return)) ApproveProposal();
 
         if (missionRunning && missionName == "Move" && (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.D)))
@@ -452,7 +481,7 @@ public class DemoDirector : MonoBehaviour
     {
         Shot("00_start");
         cam.SetMode(CamMode.Overview);
-        Say("CLOiD  /  Legacy-control integration", "A wall switch that no network knows about, found, mapped and operated by the robot.");
+        Say(robot.Title + "  /  Legacy-control integration", "A wall switch that no network knows about, found, mapped and operated by the robot.");
         yield return W(2.6f);
         cam.SetMode(CamMode.Chase);
         yield return Probe();
@@ -824,7 +853,8 @@ public class DemoDirector : MonoBehaviour
         Log("S6", "CV located " + cp.id + " (" + Mathf.Max(0.88f, cp.visConf).ToString("0.00") + "), pose estimated", Amber);
         yield return W(0.5f);
         cam.CloseUp(cp.transform.position);
-        Log("S6", "Arm: reach and " + (cp.kind == ControlKind.Dial ? "turn" : "press"), Amber);
+        if (robot.model == RobotModel.Cloid) Log("S6", "Arm: reach and " + (cp.kind == ControlKind.Dial ? "turn" : "press"), Amber);
+        else Log("S6", "Actuator: carriage to " + cp.transform.position.y.ToString("0.00") + " m, rod extends and presses", Amber);
         Shot("s6_reach_" + cp.id);
         yield return robot.Press(cp, on);
         Sfx.Play("press");
@@ -896,7 +926,9 @@ public class DemoDirector : MonoBehaviour
         yaw = Quaternion.LookRotation(facing).eulerAngles.y;
         pos = b + n * cp.standoff;
         float[] so = { cp.standoff, cp.standoff + 0.08f, cp.standoff + 0.2f };
-        float[] lat = { 0.262f, 0.12f, 0f };
+        // the arm (CLOiD) sits to the right of the centre; the piston (tracked) is on the centre line
+        float tl = robot.ToolLateral;
+        float[] lat = tl > 0f ? new[] { tl, 0.12f, 0f } : new[] { 0f, 0.10f, -0.10f };
         foreach (var s in so)
             foreach (var l in lat)
             {
