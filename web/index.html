@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Web version of the sim-demo quick demo (three.js). Open this file in a browser; three.js loads from jsDelivr. -->
+<!-- Web version of the sim-demo quick demo (three.js). Open this file in a browser; it works offline. -->
 <title>Switch Robot Web Demo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -181,7 +181,7 @@ button { font: inherit; color: inherit; }
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="vendor/three.min.js"></script>  <!-- three.js r149 (MIT), bundled so the demo runs offline -->
 <script>
 (() => {
 "use strict";
@@ -493,8 +493,9 @@ function updateCams(dt) {
     p = rp.clone().addScaledVector(r, -2.1).addScaledVector(f, -0.35).add(new THREE.Vector3(0, 1.7, 0));
     l = rp.clone().addScaledVector(f, 0.4).add(new THREE.Vector3(0, 1.0, 0));
   } else {
-    p = rp.clone().addScaledVector(f, -2.6).addScaledVector(r, -1.1).add(new THREE.Vector3(0, 2.3, 0));
-    l = rp.clone().addScaledVector(f, 1.2).add(new THREE.Vector3(0, 0.8, 0));
+    // stay below the pendant shades (they hang down to about 1.94 m)
+    p = rp.clone().addScaledVector(f, -2.5).addScaledVector(r, -1.1).add(new THREE.Vector3(0, 1.75, 0));
+    l = rp.clone().addScaledVector(f, 1.2).add(new THREE.Vector3(0, 0.75, 0));
   }
   const k = 1 - Math.exp(-3 * dt);
   camPos.lerp(p, k); camLook.lerp(l, k);
