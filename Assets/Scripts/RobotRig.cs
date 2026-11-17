@@ -122,7 +122,7 @@ public class RobotRig : MonoBehaviour
         ug.transform.SetParent(transform, false);
         ug.transform.localPosition = new Vector3(0, 0.12f, 0);
         underglow = ug.AddComponent<Light>();
-        underglow.type = LightType.Point; underglow.range = 1.9f; underglow.intensity = 0.55f;
+        underglow.type = LightType.Point; underglow.range = 1.2f; underglow.intensity = 0.3f;
         underglow.color = new Color(0.3f, 0.85f, 1f); underglow.shadows = LightShadows.None;
         underglow.renderMode = LightRenderMode.ForcePixel;
 
@@ -490,7 +490,7 @@ public class RobotRig : MonoBehaviour
         ledMat.SetColor("_EmissionColor", mood * (1.6f * k));
         ledMat.color = mood * 0.5f;
         underglow.color = Color.Lerp(Color.white, mood, 0.7f);
-        underglow.intensity = 0.45f + 0.15f * k;
+        underglow.intensity = 0.24f + 0.08f * k;
     }
 
     void LateUpdate()

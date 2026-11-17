@@ -66,9 +66,10 @@ public class Bootstrap : MonoBehaviour
     void SetupLighting()
     {
         RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.40f, 0.47f, 0.60f);
-        RenderSettings.ambientEquatorColor = new Color(0.33f, 0.35f, 0.41f);
-        RenderSettings.ambientGroundColor = new Color(0.17f, 0.16f, 0.16f);
+        // clean, near-neutral fill (the old values leaned blue)
+        RenderSettings.ambientSkyColor = new Color(0.50f, 0.53f, 0.58f);
+        RenderSettings.ambientEquatorColor = new Color(0.42f, 0.42f, 0.44f);
+        RenderSettings.ambientGroundColor = new Color(0.22f, 0.21f, 0.20f);
         RenderSettings.ambientIntensity = 1f;
         RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
         RenderSettings.reflectionIntensity = 0.6f;
@@ -96,8 +97,8 @@ public class Bootstrap : MonoBehaviour
         var g = new GameObject("SkyLight");
         skyLight = g.AddComponent<Light>();
         skyLight.type = LightType.Directional;
-        skyLight.color = new Color(0.62f, 0.72f, 1f);
-        skyLight.intensity = 0.42f;
+        skyLight.color = new Color(0.86f, 0.90f, 1f);
+        skyLight.intensity = 0.48f;
         skyLight.shadows = LightShadows.Soft;
         skyLight.shadowStrength = 0.9f;
         skyLight.shadowBias = 0.03f;
@@ -114,7 +115,9 @@ public class Bootstrap : MonoBehaviour
         mainCam.clearFlags = CameraClearFlags.Skybox;
         mainCam.nearClipPlane = 0.1f; mainCam.farClipPlane = 220f;
         mainCam.allowMSAA = true;
+        mainCam.allowHDR = true;
         mainCam.depth = 0;
+        mg.AddComponent<CleanLook>();
         camRig = mg.AddComponent<CamRig>();
         camRig.cam = mainCam; camRig.robot = robot; camRig.house = house;
 
