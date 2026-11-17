@@ -96,7 +96,7 @@ public class DemoDirector : MonoBehaviour
         {
             new ProbeRow { level = "L0", name = "Observe", detail = "camera stream, 30 fps" },
             new ProbeRow { level = "L1", name = "Re-observe", detail = "head pan / tilt, approach" },
-            new ProbeRow { level = "L2", name = "Wireless control", detail = "Wi-Fi hub, IR blaster, BT" },
+            new ProbeRow { level = "L2", name = "Wireless control", detail = "WIFI hub, IR blaster, BT" },
             new ProbeRow { level = "L3", name = "Manipulate", detail = "arm reach + safe contact" },
         };
         safety = new[]
@@ -526,7 +526,7 @@ public class DemoDirector : MonoBehaviour
         robot.Teleport(start, Quaternion.LookRotation(-cp.Normal).eulerAngles.y);
         cam.SetMode(CamMode.Chase);
         Shot("q00_start");
-        Say("Quick demo  ·  " + robot.Title, "Learn a switch, then keep the routine working when Wi-Fi fails.");
+        Say("Quick demo  ·  " + robot.Title, "Learn a switch, then keep the routine working when the WIFI channel fails.");
         yield return W(1.0f);
 
         // 1. mapping: recognise the switch and learn which light it drives
@@ -559,7 +559,7 @@ public class DemoDirector : MonoBehaviour
         ToastMsg("Trigger", r.trigger, Amber, 2.4f);
         Shot("q04_trigger");
         yield return W(1.3f);
-        Log("S4", "Intent (routine): light the living room (confidence 0.94). Risk class R1: runs without asking", Amber);
+        Log("S4", "Intent (routine): light the living room (confidence 0.94). Risk low (light): act_and_tell", Amber);
         FinishStage(3);
         yield return W(0.6f);
 
@@ -567,7 +567,7 @@ public class DemoDirector : MonoBehaviour
         yield return RunAction(cp, true);
         FinishStage(5); SetStage(6); FinishStage(6);
         finished = true; endCard = true;
-        Say("Done", "Wi-Fi failed, so the robot pressed " + cp.id + " itself. The camera confirmed the light is on.");
+        Say("Done", "WIFI failed, so the robot pressed " + cp.id + " itself. The camera confirmed the light is on.");
         Shot("q99_end");
         pace = 1f; robot.toolPace = 1f;
         yield return W(1.5f);
@@ -697,12 +697,12 @@ public class DemoDirector : MonoBehaviour
         focus = cp;
         SetStage(1);
         Say("S2 · Map and verify", cp.id + "  ->  " + cp.lampName);
-        cp.status = CtrlStatus.Candidate;
+        cp.status = CtrlStatus.Pending;
         float spatial = 0.58f + 0.12f * Mathf.Clamp01(1f - Vector3.Distance(cp.transform.position, cp.lamp.anchor) / 9f) + 0.04f * (Hash(cp.id) % 3);
         spatial = Mathf.Clamp(spatial, 0.60f, 0.76f);
         cp.mapConf = spatial;
-        Log("S2", "Candidate: " + cp.id + " -> " + cp.lampName + " (spatial context " + spatial.ToString("0.00") + ")", Blue);
-        ToastMsg("Candidate mapping", cp.id + " -> " + cp.lampName, Blue, 2.4f);
+        Log("S2", "Pending: " + cp.id + " -> " + cp.lampName + " (spatial context " + spatial.ToString("0.00") + ")", Blue);
+        ToastMsg("Mapping pending", cp.id + " -> " + cp.lampName, Blue, 2.4f);
         Color prevMood = Cyan;
         robot.SetMood(Blue, 0.5f);
         ShowLink(cp, new Color(0.45f, 0.7f, 1f, 0.95f));
@@ -801,7 +801,7 @@ public class DemoDirector : MonoBehaviour
         yield return W(2.0f);
         Log("S4", "Intent (routine): " + r.intent, Amber);
         yield return W(1.6f);
-        Log("S4", "Risk class R1 (lighting): runs without asking", Amber);
+        Log("S4", "Risk low (light): act_and_tell", Amber);
         yield return W(1.0f);
         FinishStage(3);
 
@@ -823,7 +823,7 @@ public class DemoDirector : MonoBehaviour
     List<Chan> Plan(ControlPoint cp)
     {
         var l = new List<Chan>();
-        if (cp.hasWifi) l.Add(new Chan { name = "Wi-Fi", p = cp.pWifi, cost = 0.05f, fails = cp.wifiFails, kind = 'w' });
+        if (cp.hasWifi) l.Add(new Chan { name = "WIFI", p = cp.pWifi, cost = 0.05f, fails = cp.wifiFails, kind = 'w' });
         if (cp.hasIr) l.Add(new Chan { name = "IR", p = cp.pIr, cost = 0.08f, fails = cp.irFails, kind = 'i' });
         if (cp.hasBt) l.Add(new Chan { name = "BT", p = cp.pBt, cost = 0.10f, fails = cp.btFails, kind = 'b' });
         l.Sort((a, b) => (b.p - b.cost).CompareTo(a.p - a.cost));
@@ -846,7 +846,7 @@ public class DemoDirector : MonoBehaviour
         var plan = Plan(cp);
         var sb = new List<string>();
         foreach (var c in plan) sb.Add(c.name + " " + c.p.ToString("0.00"));
-        sb.Add("PHYS " + cp.pPhys.ToString("0.00"));
+        sb.Add("ARM " + cp.pPhys.ToString("0.00"));
         Log("S5", "Mapping lookup: " + cp.id + " -> " + cp.lampName + ". Channels: " + string.Join(", ", sb.ToArray()), Amber);
         ShowLink(cp, new Color(1f, 0.78f, 0.35f, 0.95f));
         cam.Glance(cp.lamp.anchor, new Vector3(-3.4f, 3.8f, -4.6f), 3.6f);
@@ -1025,9 +1025,9 @@ public class DemoDirector : MonoBehaviour
         string name;
         if (ch == null)
         {
-            before = cp.pPhys; cp.pPhys = Mathf.Lerp(cp.pPhys, ok ? 1f : 0f, a); after = cp.pPhys; name = "PHYS";
+            before = cp.pPhys; cp.pPhys = Mathf.Lerp(cp.pPhys, ok ? 1f : 0f, a); after = cp.pPhys; name = "ARM";
         }
-        else if (ch.kind == 'w') { before = cp.pWifi; cp.pWifi = Mathf.Lerp(cp.pWifi, ok ? 1f : 0f, a); after = cp.pWifi; name = "Wi-Fi"; }
+        else if (ch.kind == 'w') { before = cp.pWifi; cp.pWifi = Mathf.Lerp(cp.pWifi, ok ? 1f : 0f, a); after = cp.pWifi; name = "WIFI"; }
         else if (ch.kind == 'i') { before = cp.pIr; cp.pIr = Mathf.Lerp(cp.pIr, ok ? 1f : 0f, a); after = cp.pIr; name = "IR"; }
         else { before = cp.pBt; cp.pBt = Mathf.Lerp(cp.pBt, ok ? 1f : 0f, a); after = cp.pBt; name = "BT"; }
         cp.mapConf = Mathf.Clamp(cp.mapConf + (ok ? 0.01f : -0.02f), 0.5f, 0.99f);

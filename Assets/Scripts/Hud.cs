@@ -163,7 +163,7 @@ public class Hud : MonoBehaviour
         switch (s)
         {
             case CtrlStatus.Detected: return "DETECTED";
-            case CtrlStatus.Candidate: return "MAPPING";
+            case CtrlStatus.Pending: return "PENDING";
             case CtrlStatus.Verified: return "VERIFIED";
             case CtrlStatus.InRoutine: return "IN ROUTINE";
             default: return "UNSEEN";
@@ -175,7 +175,7 @@ public class Hud : MonoBehaviour
         switch (s)
         {
             case CtrlStatus.Detected: return DemoDirector.Blue;
-            case CtrlStatus.Candidate: return DemoDirector.Amber;
+            case CtrlStatus.Pending: return DemoDirector.Amber;
             case CtrlStatus.Verified: return DemoDirector.Green;
             case CtrlStatus.InRoutine: return DemoDirector.Cyan;
             default: return new Color(0.5f, 0.55f, 0.62f);
@@ -264,7 +264,7 @@ public class Hud : MonoBehaviour
 
     void SafetyCard(Rect r)
     {
-        Card(r, "SAFETY GUARD", DemoDirector.Amber, "R1");
+        Card(r, "SAFETY GUARD", DemoDirector.Amber, "risk low");
         for (int i = 0; i < d.safety.Length; i++)
         {
             var s = d.safety[i];
@@ -614,7 +614,7 @@ public class Hud : MonoBehaviour
     void EndCard()
     {
         float cx = LW * 0.5f;
-        string[] l = { "Wireless first: " + d.wirelessOk + " ok, " + d.wirelessFail + " failed", "Physical fallback: " + d.physicalOk + " ok", "Safety cancels: " + d.cancelled };
+        string[] l = { "Result: " + (d.cancelled > 0 ? "cancelled" : d.wirelessOk + d.physicalOk > 0 ? "success" : "failure"), "WIFI / IR / BT: " + d.wirelessOk + " success, " + d.wirelessFail + " failure", "ARM (physical press): " + d.physicalOk + " success", "Safety Guard cancels: " + d.cancelled };
         Rect r = new Rect(20, TopY, 420, 40 + l.Length * 26 + 14);   // top left, clear of the toasts
         RR(r, new Color(0.04f, 0.055f, 0.085f, 0.92f), 18); RRo(r, Edge, 18);
         T(new Rect(r.x + 20, r.y + 8, 380, 28), "RUN SUMMARY", 13, DemoDirector.Green, TextAnchor.MiddleLeft, true);

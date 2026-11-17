@@ -163,7 +163,7 @@ button { font: inherit; color: inherit; }
   <div class="inner">
     <span class="eyebrow">LG CLOiD · SOFTWARE ENGINEERING PHASE 2</span>
     <h1>Bringing legacy controls into proactive routines</h1>
-    <p>Choose the robot for this run. Both run the same stages: find the switch, learn its light, and when the Wi-Fi plug fails, go and press it, then confirm by camera.</p>
+    <p>Choose the robot for this run. Both run the same stages: find the switch, learn its light, and when the WIFI channel (smart plug) fails, go and press it, then confirm by camera.</p>
     <div class="pick">
       <button class="card" id="cardCloid" type="button" data-robot="cloid" aria-pressed="false">
         <h3><span class="k">1</span>CLOiD</h3>
@@ -553,7 +553,7 @@ function drawFp() {
     let col, label;
     if (c.kind === "decoy") { col = "#ff8a80"; label = "WALL PANEL  " + c.conf.toFixed(2) + "  REJECT"; }
     else if (c.status === "Unseen") { col = "#ffffff"; label = "ANALYZING…  " + c.conf.toFixed(2); }
-    else { col = c.status === "Verified" ? C.learn : c.status === "In routine" ? "#4cd9ff" : C.setup; label = "ROCKER SWITCH  " + Math.max(c.conf, 0.95).toFixed(2); }
+    else { col = c.status === "Verified" ? C.learn : c.status === "In routine" ? "#4cd9ff" : C.setup; label = "SWITCH  " + Math.max(c.conf, 0.95).toFixed(2); }
     const bl = Math.min(16, (x1 - x0) * 0.35); ctx.strokeStyle = col; ctx.lineWidth = c.kind === "decoy" ? 1.5 : 2.5; ctx.beginPath();
     for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.moveTo(x + sx * bl, y); ctx.lineTo(x, y); ctx.lineTo(x, y + sy * bl); }
     ctx.stroke();
@@ -626,7 +626,7 @@ function toast(title, body, col, dur = 2.6) {
   setTimeout(() => el.remove(), dur * 1000);
 }
 function safetyCard(rows) {
-  const p = document.createElement("div"); p.className = "panel"; p.innerHTML = "<h4><span>SAFETY GUARD</span><span>R1 · lighting</span></h4>";
+  const p = document.createElement("div"); p.className = "panel"; p.innerHTML = "<h4><span>SAFETY GUARD</span><span>risk low · light</span></h4>";
   const els = rows.map((t) => { const d = document.createElement("div"); d.className = "check"; d.innerHTML = "<span></span><i>·</i>"; d.children[0].textContent = t; p.appendChild(d); return d; });
   $("cards").appendChild(p); return { p, els };
 }
@@ -651,7 +651,7 @@ function resetWorld() {
 async function quickDemo() {
   resetWorld(); const id = runId; running = true; $("bRun").textContent = "Stop"; $("bRun").classList.add("on");
   try {
-    say("Quick demo · " + robot.name, "Learn a switch, then keep the routine working when Wi-Fi fails.");
+    say("Quick demo · " + robot.name, "Learn a switch, then keep the routine working when the WIFI channel fails.");
     await wait(1.0, id);
 
     // S1: recognise the switch
@@ -659,15 +659,15 @@ async function quickDemo() {
     state.look = sw.surface();
     let tt = 0; while (sw.visTime < 0.55 && tt < 3) { await tween(0.05, () => {}); guard(id); tt += 0.05; }
     sw.status = "Detected";
-    log("S1", "Rocker switch found in Living room (conf 0.95) -> SW-01", C.setup);
-    toast("SW-01  Rocker switch", "Registered in Living room · conf 0.95", C.setup);
+    log("S1", "switch found in Living room (conf 0.95) -> SW-01", C.setup);
+    toast("SW-01  switch", "Registered in Living room · conf 0.95", C.setup);
     if (decoy.visTime > 0.2 || decoy.vis) log("S1", "Rejected: wall panel in Living room (conf 0.37 < 0.60), not an actuator", C.safety);
     await wait(0.4, id);
 
     // S2: map it to the lights and verify with a test pulse
     stage(1); say("S2 · Map and verify", "SW-01  ->  Living lights");
-    log("S2", "Candidate: SW-01 -> Living lights (spatial context 0.68)", C.setup);
-    toast("Candidate mapping", "SW-01 -> Living lights", C.setup);
+    log("S2", "Pending: SW-01 -> Living lights (spatial context 0.68)", C.setup);
+    toast("Mapping pending", "SW-01 -> Living lights", C.setup);
     showArc(0x6ea8ff); camGlance = { p: new THREE.Vector3(1.2, 3.4, 6.6), l: new THREE.Vector3(4.6, 1.3, 2.8) };
     await wait(0.9, id);
     log("S2", "Register channel: Wi-Fi smart plug, sending test pulse", C.setup);
@@ -693,20 +693,20 @@ async function quickDemo() {
     log("S4", "Trigger: Door sensor: someone arrived home, 18:42", C.runtime);
     toast("Trigger", "Door sensor: someone arrived home, 18:42", C.runtime);
     await wait(1.3, id);
-    log("S4", "Intent (routine): light the living room (confidence 0.94). Risk class R1: runs without asking", C.runtime);
+    log("S4", "Intent (routine): light the living room (confidence 0.94). Risk low (light): act_and_tell", C.runtime);
     await wait(0.6, id);
 
     // S5: wireless first, and it fails
     stage(4); say("S5 · Wireless control", "Living lights ON");
-    log("S5", "Mapping lookup: SW-01 -> Living lights. Channels: Wi-Fi 0.66, PHYS 0.82", C.runtime);
+    log("S5", "Mapping lookup: SW-01 -> Living lights. Channels: WIFI 0.66, ARM 0.82", C.runtime);
     showArc(0xffb84d); camGlance = { p: new THREE.Vector3(1.2, 3.4, 6.6), l: new THREE.Vector3(4.8, 1.0, 2.6) };
     await wait(1.0, id);
-    log("S5", "Send ON via Wi-Fi (Wi-Fi smart plug)", C.runtime);
+    log("S5", "Send ON via WIFI (Wi-Fi smart plug)", C.runtime);
     await wifiRings(true); guard(id);
     counts.wFail++;
-    log("S5", "Wi-Fi: device reported an error, state unchanged", C.safety);
-    toast("Wi-Fi failed", "Device reported an error", C.safety);
-    log("S7", "Learn: SW-01  Wi-Fi  0.66 -> 0.45  (failure)", C.learn);
+    log("S5", "WIFI: device reported an error, state unchanged", C.safety);
+    toast("WIFI failed", "Device reported an error", C.safety);
+    log("S7", "Learn: SW-01  WIFI  0.66 -> 0.45  (failure)", C.learn);
     await wait(0.9, id);
     hideArc(); camGlance = null;
 
@@ -751,8 +751,8 @@ async function quickDemo() {
     log("S6", "CV state check: delta-L +0.46 -> Living lights ON confirmed", C.learn);
     toast("Living lights ON", "Operated physically, confirmed by CV", C.learn);
     stage(6);
-    log("S7", "Learn: SW-01  PHYS  0.82 -> 0.88  (success)", C.learn);
-    toast("Learning update", "SW-01  PHYS  0.82 -> 0.88", C.learn);
+    log("S7", "Learn: SW-01  ARM  0.82 -> 0.88  (success)", C.learn);
+    toast("Learning update", "SW-01  ARM  0.82 -> 0.88", C.learn);
     await back(); guard(id);
     state.look = null; camMode = "chase";
     finish(id);
@@ -762,9 +762,9 @@ function finish(id) {
   if (id !== runId) return;
   const p = document.createElement("div"); p.className = "panel summary";
   p.innerHTML = "<h4><span>RUN SUMMARY</span><span>" + (clock - t0).toFixed(1) + " s</span></h4>";
-  for (const t of ["Wireless first: " + counts.wOk + " ok, " + counts.wFail + " failed", "Physical fallback: " + counts.phys + " ok", "Safety cancels: " + counts.cancel]) { const d = document.createElement("div"); d.textContent = t; p.appendChild(d); }
+  for (const t of ["Result: " + (counts.cancel ? "cancelled" : counts.phys + counts.wOk ? "success" : "failure"), "WIFI: " + counts.wOk + " success, " + counts.wFail + " failure", "ARM (physical press): " + counts.phys + " success", "Safety Guard cancels: " + counts.cancel]) { const d = document.createElement("div"); d.textContent = t; p.appendChild(d); }
   $("cards").appendChild(p);
-  if (counts.cancel === 0) say("Done", "Wi-Fi failed, so the robot pressed SW-01 itself. The camera confirmed the light is on.");
+  if (counts.cancel === 0) say("Done", "WIFI failed, so the robot pressed SW-01 itself. The camera confirmed the light is on.");
   stage(-1); running = false; $("bRun").textContent = "Quick demo"; $("bRun").classList.remove("on");
 }
 

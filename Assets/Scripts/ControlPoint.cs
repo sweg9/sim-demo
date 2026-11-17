@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum ControlKind { Rocker, Push, Dial, Decoy }
-public enum CtrlStatus { Unseen, Detected, Candidate, Verified, InRoutine }
+public enum CtrlStatus { Unseen, Detected, Pending, Verified, InRoutine }
 
 /// <summary>A lamp group that a wall control switches on and off.</summary>
 public class RoomLight : MonoBehaviour

@@ -421,11 +421,11 @@ public class House : MonoBehaviour
         // art and shelf detail
 
         // wall controls (S1 targets)
-        var cp1 = MakeControl("SW-01", "Living ceiling light", "Living room", "Rocker switch", ControlKind.Rocker,
+        var cp1 = MakeControl("SW-01", "Living ceiling light", "Living room", "switch", ControlKind.Rocker,
             new Vector3(7.94f, 1.25f, 3.0f), Vector3.left, living, "Living lights");
         cp1.hasWifi = true; cp1.wifiFails = true; cp1.channelNote = "Wi-Fi smart plug";
         cp1.pWifi = 0.66f; cp1.pPhys = 0.82f;
-        var cp5 = MakeControl("SW-05", "Reading lamp dimmer", "Living room", "Rotary dial", ControlKind.Dial,
+        var cp5 = MakeControl("SW-05", "Reading lamp", "Living room", "switch", ControlKind.Rocker,
             new Vector3(0.0f, 1.25f, 4.75f), Vector3.right, nook, "Reading lamp", 0.65f);
         cp5.hasBt = true; cp5.btFails = true; cp5.channelNote = "BT lamp bulb";
         cp5.pBt = 0.55f; cp5.pPhys = 0.78f;
@@ -476,7 +476,7 @@ public class House : MonoBehaviour
         kit.AddLight(uc);
         Art(new Vector3(6.4f, 1.7f, 9.0f), Vector3.back, 1.1f, 0.8f, "art_teal", "N");
 
-        var cp2 = MakeControl("SW-02", "Kitchen pendants", "Kitchen & dining", "Push button", ControlKind.Push,
+        var cp2 = MakeControl("SW-02", "Kitchen pendants", "Kitchen & dining", "switch", ControlKind.Push,
             new Vector3(7.94f, 1.25f, 5.55f), Vector3.left, kit, "Kitchen pendants");
         cp2.hasIr = true; cp2.channelNote = "IR hub";
         cp2.pIr = 0.74f; cp2.pPhys = 0.80f;
@@ -507,7 +507,7 @@ public class House : MonoBehaviour
         }
         Art(new Vector3(13.0f, 1.6f, 3.4f), Vector3.left, 0.9f, 0.9f, "art_sand", "E");
 
-        var cp3 = MakeControl("SW-03", "Hall lights dimmer", "Hall", "Rotary dial", ControlKind.Dial,
+        var cp3 = MakeControl("SW-03", "Hall lights", "Hall", "switch", ControlKind.Rocker,
             new Vector3(9.35f, 1.25f, 0.0f), Vector3.forward, hall, "Hall lights", 0.6f);
         cp3.channelNote = "none (physical only)";
         cp3.pPhys = 0.84f;
@@ -537,7 +537,7 @@ public class House : MonoBehaviour
         bed.AddLight(ceil);
         Art(new Vector3(11.0f, 1.55f, 9.0f), Vector3.back, 1.7f, 0.8f, "art_sand", "N");
 
-        var cp4 = MakeControl("SW-04", "Bedroom lights", "Bedroom", "Rocker switch", ControlKind.Rocker,
+        var cp4 = MakeControl("SW-04", "Bedroom lights", "Bedroom", "switch", ControlKind.Rocker,
             new Vector3(11.6f, 1.25f, 4.26f), Vector3.forward, bed, "Bedroom lights");
         cp4.hasWifi = true; cp4.channelNote = "Wi-Fi smart plug";
         cp4.pWifi = 0.78f; cp4.pPhys = 0.82f;
