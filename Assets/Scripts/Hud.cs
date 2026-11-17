@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>IMGUI overlay: stage tracker, robot camera with detection overlay, registry, log, minimap, captions.</summary>
+/// <summary>IMGUI overlay: third-person half with stage bar, minimap and captions; first-person camera and process log half.</summary>
 public class Hud : MonoBehaviour
 {
     public DemoDirector d;
@@ -15,6 +15,7 @@ public class Hud : MonoBehaviour
     static readonly Color Edge = new Color(0.55f, 0.72f, 0.95f, 0.22f);
     static readonly Color Txt = new Color(0.93f, 0.96f, 1f);
     static readonly Color Dim = new Color(0.60f, 0.68f, 0.78f);
+    static readonly Color RightBg = new Color(0.035f, 0.045f, 0.06f, 1f);
 
     Font font;
     GUIStyle ts;
@@ -182,6 +183,11 @@ public class Hud : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ main
+    // Layout: the left half is the third-person view (main camera viewport) with a compact stage bar,
+    // the minimap and captions; the right half is the robot's first-person camera above the process log.
+    float LW { get { return Mathf.Round(W * 0.5f); } }
+    const float TopY = 80;          // first row under the header
+
     void OnGUI()
     {
         if (d == null || robot == null) return;
@@ -191,9 +197,11 @@ public class Hud : MonoBehaviour
 
         if (Event.current.type == EventType.Repaint || Event.current.type == EventType.MouseDown || Event.current.type == EventType.MouseUp || Event.current.type == EventType.Layout)
         {
+            Fill(new Rect(LW, 0, W - LW, Hh), RightBg);
+            Fill(new Rect(LW - 1, 0, 2, Hh), new Color(1, 1, 1, 0.08f));
             WorldTags();
-            TopBar();
-            LeftColumn();
+            Header();
+            LeftCards();
             RightColumn();
             Minimap();
             Caption();
@@ -205,63 +213,30 @@ public class Hud : MonoBehaviour
         }
     }
 
-    // ------------------------------------------------------------------ pieces
-    void TopBar()
+    // ------------------------------------------------------------------ left half: header, stages, cards
+    void Header()
     {
-        float pw = 150, gap = 8, total = 7 * pw + 6 * gap;
-        float x0 = (W - total) * 0.5f - 70, y = 18;
-        string[] phase = { "SETUP", "RUNTIME", "LEARNING" };
-        int[] pf = { 0, 3, 6 }, pl = { 2, 5, 6 };
-        for (int p = 0; p < 3; p++)
-        {
-            float a = x0 + pf[p] * (pw + gap), b = x0 + pl[p] * (pw + gap) + pw;
-            Color c = DemoDirector.StageColor(pf[p]);
-            T(new Rect(a, y - 4, b - a, 16), phase[p], 11, new Color(c.r, c.g, c.b, 0.85f), TextAnchor.MiddleCenter, true);
-            Fill(new Rect(a + 6, y + 13, b - a - 12, 2), new Color(c.r, c.g, c.b, 0.35f));
-        }
-        for (int i = 0; i < 7; i++)
-        {
-            Rect r = new Rect(x0 + i * (pw + gap), y + 20, pw, 52);
-            Color c = DemoDirector.StageColor(i);
-            int st = d.stageState[i];
-            float act = Smooth("st" + i, st == 1 ? 1f : 0f, 5f);
-            float done = Smooth("sd" + i, st == 2 ? 1f : 0f, 5f);
-            RR(r, Color.Lerp(new Color(0.04f, 0.055f, 0.08f, 0.72f), new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, 0.92f), Mathf.Max(act, done * 0.6f)), 12);
-            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 4f);
-            RRo(r, new Color(c.r, c.g, c.b, Mathf.Lerp(0.18f, 0.4f + 0.5f * pulse, act) * (st == 2 ? 1.6f : 1f)), 12, act > 0.5f ? 2f : 1f);
-            if (act > 0.5f) GUI.DrawTexture(new Rect(r.x - 30, r.y - 22, r.width + 60, r.height + 44), glowTex, ScaleMode.StretchToFill, true, 0, new Color(c.r, c.g, c.b, 0.12f + 0.10f * pulse), 0, 0);
-            T(new Rect(r.x + 12, r.y + 6, 40, 24), "S" + (i + 1), 20, st == 0 ? Dim : Color.Lerp(Txt, c, 0.5f), TextAnchor.MiddleLeft, true);
-            if (st == 2) T(new Rect(r.xMax - 36, r.y + 6, 26, 24), "OK", 12, c, TextAnchor.MiddleRight, true);
-            T(new Rect(r.x + 12, r.y + 29, r.width - 16, 20), DemoDirector.StageName[i], 13, st == 0 ? Dim : Txt, TextAnchor.MiddleLeft, st == 1);
-        }
-        // mission chip
-        Rect mc = new Rect(x0 + total + 18, y + 20, 150, 52);
-        RR(mc, Panel, 12); RRo(mc, Edge, 12);
-        T(new Rect(mc.x + 12, mc.y + 6, mc.width - 20, 20), d.missionRunning ? (d.auto ? "AUTO DEMO" : "RUNNING") : "MANUAL", 13, d.missionRunning ? DemoDirector.Cyan : Dim, TextAnchor.MiddleLeft, true);
-        float t = d.missionRunning ? Time.time - d.missionT0 : 0f;
-        T(new Rect(mc.x + 12, mc.y + 26, mc.width - 20, 22), d.missionRunning ? ((int)(t / 60)).ToString("00") + ":" + (t % 60).ToString("00") + "  " + d.missionName : "Drive with WASD", 12, Txt, TextAnchor.MiddleLeft);
+        float x = 20, y = 16;
+        Rect chip = new Rect(x, y, 300, 48);
+        RR(chip, Panel, 12); RRo(chip, Edge, 12);
+        Fill(new Rect(x + 14, y + 12, 3, 24), DemoDirector.Cyan);
+        T(new Rect(x + 26, y + 4, 260, 24), robot.Title, 20, Txt, TextAnchor.MiddleLeft, true);
+        T(new Rect(x + 26, y + 26, 260, 18), d.missionRunning ? d.missionName + "  ·  " + Clock(Time.time - d.missionT0) : "Legacy control integration demo", 12, d.missionRunning ? DemoDirector.Cyan : Dim, TextAnchor.MiddleLeft);
+        float bx = chip.xMax + 12, by = y + 9, bh = 30;
+        if (Btn(new Rect(bx, by, 112, bh), d.missionRunning && d.auto ? "Stop" : "Quick demo", DemoDirector.Cyan, d.auto && d.missionRunning))
+        { if (d.missionRunning && d.auto) d.CancelMission("Demo stopped"); else if (!d.missionRunning) d.StartQuick(); }
+        if (Btn(new Rect(bx + 120, by, 96, bh), "Full demo", DemoDirector.Blue)) { if (!d.missionRunning) d.StartAuto(); }
+        if (Btn(new Rect(bx + 224, by, 72, bh), "Reset", DemoDirector.Mute)) d.ResetWorld();
+        if (Btn(new Rect(bx + 304, by, 84, bh), "Robot", DemoDirector.Mute)) { if (!d.missionRunning) { d.ResetWorld(); d.introVisible = true; } }
     }
 
-    void LeftColumn()
-    {
-        float x = 20, y = 18;
-        RR(new Rect(x, y, 330, 52), Panel, 14); RRo(new Rect(x, y, 330, 52), Edge, 14);
-        Fill(new Rect(x + 16, y + 14, 3, 24), DemoDirector.Cyan);
-        T(new Rect(x + 28, y + 6, 290, 26), robot.Title, 22, Txt, TextAnchor.MiddleLeft, true);
-        T(new Rect(x + 28, y + 28, 290, 20), "Legacy control integration demo", 12, Dim, TextAnchor.MiddleLeft);
-        // buttons
-        y += 62;
-        float bw = 76, bh = 30;
-        if (Btn(new Rect(x, y, 98, bh), d.missionRunning && d.auto ? "Stop" : "Quick demo", DemoDirector.Cyan, d.auto && d.missionRunning))
-        { if (d.missionRunning && d.auto) d.CancelMission("Demo stopped"); else if (!d.missionRunning) d.StartQuick(); }
-        if (Btn(new Rect(x + 104, y, bw + 8, bh), "Routine", DemoDirector.Amber)) { if (!d.missionRunning) d.RunRoutineKey("evening"); }
-        if (Btn(new Rect(x + 104 + bw + 14, y, bw + 18, bh), "Goodnight", DemoDirector.Amber)) { if (!d.missionRunning) d.RunRoutineKey("goodnight"); }
-        if (Btn(new Rect(x + 104 + bw + bw + 40, y, 48, bh), "Reset", DemoDirector.Mute)) d.ResetWorld();
-        y += 42;
+    static string Clock(float t) { return ((int)(t / 60)).ToString("00") + ":" + ((int)(t % 60)).ToString("00"); }
 
+    void LeftCards()
+    {
+        float x = 20, y = TopY;
         if (d.probeOpen) { ProbeCard(new Rect(x, y, 330, 36 + 4 * 44)); y += 36 + 4 * 44 + 12; }
-        if (d.safetyOpen) { SafetyCard(new Rect(x, y, 330, 36 + 4 * 38)); y += 36 + 4 * 38 + 12; }
-        if (d.focus != null) { ChannelCard(new Rect(x, y, 330, 214), d.focus); y += 226; }
+        if (d.safetyOpen) SafetyCard(new Rect(x, y, 330, 36 + 4 * 38));
     }
 
     void ProbeCard(Rect r)
@@ -304,53 +279,20 @@ public class Hud : MonoBehaviour
         }
     }
 
-    void ChannelCard(Rect r, ControlPoint cp)
-    {
-        Card(r, "CHANNEL SCORES", DemoDirector.Green, cp.id);
-        T(new Rect(r.x + 16, r.y + 36, r.width - 32, 20), cp.lampName + "  ·  map conf " + cp.mapConf.ToString("0.00"), 12, Txt, TextAnchor.MiddleLeft);
-        var rows = new List<KeyValuePair<string, float>>();
-        if (cp.hasWifi) rows.Add(new KeyValuePair<string, float>("Wi-Fi", cp.pWifi));
-        if (cp.hasIr) rows.Add(new KeyValuePair<string, float>("IR", cp.pIr));
-        if (cp.hasBt) rows.Add(new KeyValuePair<string, float>("BT", cp.pBt));
-        rows.Add(new KeyValuePair<string, float>("PHYS", cp.pPhys));
-        float y = r.y + 64;
-        foreach (var kv in rows)
-        {
-            float v = Smooth(cp.id + kv.Key, kv.Value, 0.35f);
-            Color c = kv.Key == "PHYS" ? DemoDirector.Amber : DemoDirector.Blue;
-            if (v < 0.40f) c = DemoDirector.Red;
-            T(new Rect(r.x + 16, y, 52, 22), kv.Key, 12, Txt, TextAnchor.MiddleLeft, true);
-            Rect bar = new Rect(r.x + 70, y + 6, r.width - 140, 10);
-            RR(bar, new Color(1, 1, 1, 0.08f), 5);
-            RR(new Rect(bar.x, bar.y, Mathf.Max(8, bar.width * v), bar.height), new Color(c.r, c.g, c.b, 0.9f), 5);
-            Fill(new Rect(bar.x + bar.width * 0.4f, bar.y - 3, 1, 16), new Color(1, 1, 1, 0.35f));
-            T(new Rect(r.xMax - 62, y, 48, 22), v.ToString("0.00"), 12, c, TextAnchor.MiddleRight, true);
-            y += 28;
-        }
-        if (!string.IsNullOrEmpty(d.lastLearn))
-        {
-            Rect lr = new Rect(r.x + 14, r.yMax - 40, r.width - 28, 28);
-            RR(lr, new Color(DemoDirector.Green.r, DemoDirector.Green.g, DemoDirector.Green.b, 0.12f), 9);
-            T(lr, "S7  " + d.lastLearn, 12, DemoDirector.Green, TextAnchor.MiddleCenter, true);
-        }
-        T(new Rect(r.x + 70 + (r.width - 140) * 0.4f - 24, r.y + 36, 48, 18), "", 10, Dim, TextAnchor.MiddleCenter);
-    }
-
     // ------------------------------------------------------------------ right column
     void RightColumn()
     {
-        float w = 520, x = W - w - 20, y = 18;
-        FeedCard(new Rect(x, y, w, 36 + 325 + 12));
-        y += 36 + 325 + 12 + 12;
-        RegistryCard(new Rect(x, y, w, 36 + 5 * 34 + 12));
-        y += 36 + 5 * 34 + 12 + 12;
-        LogCard(new Rect(x, y, w, Hh - y - 18));
+        float x = LW + 16, w = W - LW - 32, y = 16;
+        float fh = (w - 20) * 0.625f;              // robot feed is 1024 x 640
+        FeedCard(new Rect(x, y, w, 36 + fh + 10));
+        y += 36 + fh + 10 + 12;
+        LogCard(new Rect(x, y, w, Hh - y - 16));
     }
 
     void FeedCard(Rect r)
     {
-        Card(r, "ROBOT CAM  ·  " + robot.UnitId, DemoDirector.Cyan);
-        Rect fr = new Rect(r.x + 10, r.y + 36, r.width - 20, 325);
+        Card(r, "FIRST-PERSON  ·  ROBOT CAM  ·  " + robot.UnitId, DemoDirector.Cyan, d.missionRunning ? d.missionName.ToUpper() : "MANUAL");
+        Rect fr = new Rect(r.x + 10, r.y + 36, r.width - 20, r.height - 46);
         GUI.DrawTexture(fr, robot.feed, ScaleMode.StretchToFill, false);
         GUI.DrawTexture(fr, vignette, ScaleMode.StretchToFill, true);
         // scan line
@@ -417,50 +359,47 @@ public class Hud : MonoBehaviour
         Fill(new Rect(b.xMax - L, b.yMax - th, L, th), c); Fill(new Rect(b.xMax - th, b.yMax - L, th, L), c);
     }
 
-    void RegistryCard(Rect r)
-    {
-        int n = 0; foreach (var c in house.controls) if (!c.IsDecoy && c.status != CtrlStatus.Unseen) n++;
-        Card(r, "CONTROL REGISTRY", DemoDirector.Blue, n + " / 5");
-        int row = 0;
-        foreach (var cp in house.controls)
-        {
-            if (cp.IsDecoy) continue;
-            Rect rr = new Rect(r.x + 10, r.y + 38 + row * 34, r.width - 20, 30);
-            bool foc = d.focus == cp;
-            RR(rr, foc ? new Color(1, 1, 1, 0.10f) : new Color(1, 1, 1, row % 2 == 0 ? 0.035f : 0.0f), 8);
-            bool seen = cp.status != CtrlStatus.Unseen;
-            T(new Rect(rr.x + 10, rr.y, 56, rr.height), cp.id, 13, seen ? Txt : Dim, TextAnchor.MiddleLeft, true);
-            T(new Rect(rr.x + 68, rr.y, 120, rr.height), seen ? cp.typeName : "-", 12, seen ? Txt : Dim, TextAnchor.MiddleLeft);
-            T(new Rect(rr.x + 190, rr.y, 120, rr.height), seen ? cp.room : "", 12, Dim, TextAnchor.MiddleLeft);
-            Color sc = StatusColor(cp.status);
-            Rect pill = new Rect(rr.xMax - 150, rr.y + 5, 96, 20);
-            RR(pill, new Color(sc.r, sc.g, sc.b, 0.20f), 10);
-            T(pill, StatusText(cp.status), 10, sc, TextAnchor.MiddleCenter, true);
-            T(new Rect(rr.xMax - 50, rr.y, 42, rr.height), seen ? cp.mapConf > 0 ? cp.mapConf.ToString("0.00") : cp.conf.ToString("0.00") : "", 12, Txt, TextAnchor.MiddleRight);
-            row++;
-        }
-    }
-
     void LogCard(Rect r)
     {
-        Card(r, "PROCESS LOG", DemoDirector.Mute, "end-to-end trace");
+        int cur = -1;
+        for (int i = 6; i >= 0; i--) if (d.stageState[i] == 1) { cur = i; break; }
+        Card(r, "PROCESS LOG", cur >= 0 ? DemoDirector.StageColor(cur) : DemoDirector.Mute,
+            cur >= 0 ? "Now:  S" + (cur + 1) + "  ·  " + DemoDirector.StageName[cur] : "mapping · wireless · physical · verify");
         float y = r.yMax - 12;
         float w = r.width - 28;
+        float textX = r.x + 230, textW = r.xMax - 14 - textX;
         for (int i = d.log.Count - 1; i >= 0 && y > r.y + 40; i--)
         {
             var l = d.log[i];
-            float h = Mathf.Max(18, TH(l.text, 12, w - 92));
-            y -= h + 4;
+            float h = Mathf.Max(22, TH(l.text, 15, textW));
+            y -= h + 6;
             if (y < r.y + 38) break;
-            float age = Time.time - 0f;
             Color tc = l.col;
-            Rect tag = new Rect(r.x + 14, y + 1, 40, 17);
+            Rect tag = new Rect(r.x + 14, y + 1, 150, 20);
             Color sc = TagColor(l.tag);
             RR(tag, new Color(sc.r, sc.g, sc.b, 0.22f), 6);
-            T(tag, l.tag, 10, sc, TextAnchor.MiddleCenter, true);
-            T(new Rect(r.x + 60, y, 50, 18), l.time, 10, Dim, TextAnchor.MiddleLeft);
+            T(new Rect(tag.x + 8, tag.y, tag.width - 12, tag.height), TagLabel(l.tag), 11, sc, TextAnchor.MiddleLeft, true);
+            T(new Rect(r.x + 172, y, 56, 22), l.time, 12, Dim, TextAnchor.MiddleLeft);
             float alpha = i == d.log.Count - 1 ? 1f : 0.88f;
-            T(new Rect(r.x + 106, y, w - 92, h), l.text, 12, new Color(tc.r, tc.g, tc.b, alpha) * (tc == DemoDirector.Mute ? 1.15f : 1f), TextAnchor.UpperLeft, false, true);
+            if (i == d.log.Count - 1) RR(new Rect(r.x + 8, y - 3, r.width - 16, h + 6), new Color(1, 1, 1, 0.05f), 8);
+            T(new Rect(textX, y, textW, h), l.text, 15, new Color(tc.r, tc.g, tc.b, alpha) * (tc == DemoDirector.Mute ? 1.15f : 1f), TextAnchor.UpperLeft, false, true);
+        }
+    }
+
+    // "S5" -> "S5  Wireless", "SAFE" -> "Safety Guard"
+    static string TagLabel(string tag)
+    {
+        switch (tag)
+        {
+            case "S1": return "S1  Recognize";
+            case "S2": return "S2  Map & verify";
+            case "S3": return "S3  Routine";
+            case "S4": return "S4  Trigger";
+            case "S5": return "S5  Wireless";
+            case "S6": return "S6  Physical";
+            case "S7": return "S7  Learn";
+            case "SAFE": return "Safety Guard";
+            default: return tag;
         }
     }
 
@@ -524,7 +463,7 @@ public class Hud : MonoBehaviour
             string s = cp.id + "  " + cp.lampName;
             float w = s.Length * 7f + 28;
             Rect r = new Rect(p.x - w / 2, p.y - 36, w, 24);
-            if (r.xMax > W - 560 || r.x < 0 || r.y < 90) continue;
+            if (r.xMax > LW - 8 || r.x < 0 || r.y < TopY) continue;
             RR(r, new Color(0.03f, 0.05f, 0.08f, 0.82f * (0.5f + 0.5f * k)), 12);
             RRo(r, new Color(c.r, c.g, c.b, 0.8f), 12);
             RR(new Rect(r.x + 8, r.y + 8, 8, 8), c, 4);
@@ -539,31 +478,31 @@ public class Hud : MonoBehaviour
         if (string.IsNullOrEmpty(d.capHead)) return;
         float age = Time.time - d.capT;
         float a = Mathf.Clamp01(age / 0.35f);
-        float w = 880;
-        float cx = (W - 540 - 370) * 0.5f + 370;
-        Rect r = new Rect(cx - w / 2, Hh - 150 + (1f - a) * 14, w, 86);
-        Color sc = Color.white;
+        float x = 20 + 360 + 16, w = LW - 20 - x;
+        float bh = TH(d.capBody, 15, w - 56);
+        float h = 46 + bh + 14;
+        Rect r = new Rect(x, Hh - 44 - h + (1f - a) * 14, w, h);
         int cur = -1;
         for (int i = 6; i >= 0; i--) if (d.stageState[i] == 1) { cur = i; break; }
         Color acc = cur >= 0 ? DemoDirector.StageColor(cur) : DemoDirector.Cyan;
         var og = GUI.color; GUI.color = new Color(1, 1, 1, a);
-        RR(r, new Color(0.03f, 0.045f, 0.07f, 0.84f), 18);
-        RRo(r, new Color(acc.r, acc.g, acc.b, 0.55f), 18, 1.5f);
-        Fill(new Rect(r.x + 22, r.y + 22, 4, 42), acc);
-        T(new Rect(r.x + 40, r.y + 10, w - 60, 38), d.capHead, 26, Txt, TextAnchor.MiddleLeft, true);
-        T(new Rect(r.x + 40, r.y + 48, w - 60, 30), d.capBody, 17, Dim, TextAnchor.MiddleLeft);
+        RR(r, new Color(0.03f, 0.045f, 0.07f, 0.86f), 16);
+        RRo(r, new Color(acc.r, acc.g, acc.b, 0.55f), 16, 1.5f);
+        Fill(new Rect(r.x + 18, r.y + 16, 4, h - 32), acc);
+        T(new Rect(r.x + 34, r.y + 10, w - 50, 32), d.capHead, 22, Txt, TextAnchor.MiddleLeft, true);
+        T(new Rect(r.x + 34, r.y + 44, w - 56, bh + 4), d.capBody, 15, Dim, TextAnchor.UpperLeft, false, true);
         GUI.color = og;
     }
 
     void Toasts()
     {
-        float cx = (W - 540 - 370) * 0.5f + 370 - 40;
-        float y = 104;
+        float w0 = 420, cx = LW - 20 - w0 / 2;
+        float y = TopY;
         foreach (var t in d.toasts)
         {
             float age = Time.time - t.t0;
             float a = Mathf.Clamp01(age / 0.25f) * Mathf.Clamp01((t.dur - age) / 0.4f);
-            float w = 470, h = 62;
+            float w = w0, h = 62;
             Rect r = new Rect(cx - w / 2, y + (1f - Mathf.Clamp01(age / 0.25f)) * -16f, w, h);
             var og = GUI.color; GUI.color = new Color(1, 1, 1, a);
             RR(r, new Color(0.035f, 0.05f, 0.075f, 0.9f), 16);
@@ -579,11 +518,11 @@ public class Hud : MonoBehaviour
 
     void Hints()
     {
-        string s = "WASD / click to drive   Right-drag orbit   C camera   SPACE quick demo   L full demo   R routine   H hazard   M robot   T reset";
-        float cx = (W - 540 - 370) * 0.5f + 370;
-        Rect r = new Rect(cx - 460, Hh - 50, 920, 24);
-        T(r, s, 12, new Color(1, 1, 1, 0.55f), TextAnchor.MiddleCenter, true);
-        if (d.hazard) { RR(new Rect(cx - 90, Hh - 78, 180, 22), new Color(1f, 0.42f, 0.42f, 0.25f), 11); T(new Rect(cx - 90, Hh - 78, 180, 22), "HAZARD INJECTED", 11, DemoDirector.Red, TextAnchor.MiddleCenter, true); }
+        string s = "WASD drive   C camera   SPACE quick demo   L full demo   H hazard   M robot   T reset";
+        float x = 20 + 360 + 16, cx = (x + LW - 20) * 0.5f;
+        Rect r = new Rect(x, Hh - 36, LW - 20 - x, 22);
+        T(r, s, 11, new Color(1, 1, 1, 0.55f), TextAnchor.MiddleCenter, true);
+        if (d.hazard) { RR(new Rect(cx - 90, Hh - 64, 180, 22), new Color(1f, 0.42f, 0.42f, 0.25f), 11); T(new Rect(cx - 90, Hh - 64, 180, 22), "HAZARD INJECTED", 11, DemoDirector.Red, TextAnchor.MiddleCenter, true); }
     }
 
     void ProposalCard()
@@ -592,10 +531,10 @@ public class Hud : MonoBehaviour
         if (!p.open) return;
         float a = Mathf.Clamp01((Time.time - p.openT) / 0.35f);
         var og = GUI.color; GUI.color = new Color(1, 1, 1, a);
-        float w = 640, h = 130 + p.lines.Count * 32 + 70;
-        float cx = (W - 540 - 370) * 0.5f + 370;
+        float w = Mathf.Min(640, LW - 40), h = 130 + p.lines.Count * 32 + 70;
+        float cx = LW * 0.5f;
         Rect r = new Rect(cx - w / 2, 220 + (1f - a) * 20, w, h);
-        Fill(new Rect(0, 0, W, Hh), new Color(0, 0, 0, 0.38f * a));
+        Fill(new Rect(0, 0, LW, Hh), new Color(0, 0, 0, 0.38f * a));
         RR(r, new Color(0.04f, 0.055f, 0.085f, 0.97f), 22);
         RRo(r, new Color(DemoDirector.Blue.r, DemoDirector.Blue.g, DemoDirector.Blue.b, 0.8f), 22, 2);
         T(new Rect(r.x + 28, r.y + 20, w - 56, 20), "S3  ROUTINE PROPOSAL", 13, DemoDirector.Blue, TextAnchor.MiddleLeft, true);
@@ -674,9 +613,9 @@ public class Hud : MonoBehaviour
 
     void EndCard()
     {
-        float cx = (W - 540 - 370) * 0.5f + 370;
+        float cx = LW * 0.5f;
         string[] l = { "Wireless first: " + d.wirelessOk + " ok, " + d.wirelessFail + " failed", "Physical fallback: " + d.physicalOk + " ok", "Safety cancels: " + d.cancelled };
-        Rect r = new Rect(cx - 210, 210, 420, 40 + l.Length * 26 + 14);
+        Rect r = new Rect(20, TopY, 420, 40 + l.Length * 26 + 14);   // top left, clear of the toasts
         RR(r, new Color(0.04f, 0.055f, 0.085f, 0.92f), 18); RRo(r, Edge, 18);
         T(new Rect(r.x + 20, r.y + 8, 380, 28), "RUN SUMMARY", 13, DemoDirector.Green, TextAnchor.MiddleLeft, true);
         for (int i = 0; i < l.Length; i++) T(new Rect(r.x + 20, r.y + 40 + i * 26, 380, 24), l[i], 15, Txt, TextAnchor.MiddleLeft);

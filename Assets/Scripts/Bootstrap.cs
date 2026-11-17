@@ -116,6 +116,7 @@ public class Bootstrap : MonoBehaviour
         mainCam.nearClipPlane = 0.1f; mainCam.farClipPlane = 220f;
         mainCam.allowMSAA = true;
         mainCam.allowHDR = true;
+        mainCam.rect = new Rect(0f, 0f, 0.5f, 1f);   // third-person view on the left half; the HUD owns the right half
         mainCam.depth = 0;
         mg.AddComponent<CleanLook>();
         camRig = mg.AddComponent<CamRig>();
@@ -194,6 +195,7 @@ public class Bootstrap : MonoBehaviour
         dir.introVisible = false;
         hud.enabled = false;
         camRig.enabled = false;
+        mainCam.rect = new Rect(0f, 0f, 1f, 1f);
         yield return null;
         var views = new (string name, Vector3 pos, Vector3 look, float fov, bool lights)[]
         {

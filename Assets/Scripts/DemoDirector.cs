@@ -351,7 +351,9 @@ public class DemoDirector : MonoBehaviour
         if (!Input.GetMouseButtonDown(0) || missionRunning || introVisible || proposal.open || cam == null) return;
         float s = Screen.height / 1080f;
         Vector2 m = Input.mousePosition;
-        if (m.x < 370f * s || m.x > Screen.width - 560f * s || m.y < 120f * s) return;
+        // only the third-person half, outside the header and the minimap
+        if (m.x > Screen.width * 0.5f || m.y > Screen.height - 72f * s) return;
+        if (m.x < 396f * s && m.y < 340f * s) return;
         var plane = new Plane(Vector3.up, Vector3.zero);
         Ray ray = cam.cam.ScreenPointToRay(m);
         float d;

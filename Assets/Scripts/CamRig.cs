@@ -131,7 +131,7 @@ public class CamRig : MonoBehaviour
                 Vector3 target = rp + Vector3.up * 0.9f;
                 dPos = target - q * Vector3.forward * chaseDist;
                 dRot = q;
-                dFov = 46f;
+                dFov = 52f;            // the view is half the screen wide
                 break;
             }
         }
