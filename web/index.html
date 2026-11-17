@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Web version of the sim-demo quick demo (three.js). Open this file in a browser; three.js loads from jsDelivr. -->
+<title>Switch Robot Web Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: a simulator console. Left half = third-person view with captions and minimap;
+   right half = the robot's first-person camera over a stage-labelled process log. Single dark look by design. */
+:root {
+  color-scheme: dark;
+  --bg: #0b1015;
+  --panel: rgba(10, 16, 23, .86);
+  --panel-solid: #111a22;
+  --line: rgba(150, 190, 235, .18);
+  --ink: #e8f0f6;
+  --dim: #93a3b2;
+  --cyan: #4cd9ff;
+  --setup: #6ea8ff;
+  --runtime: #ffb84d;
+  --learn: #5fe6a0;
+  --safety: #ff6b6b;
+  --f-ui: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 400 14px/1.45 var(--f-ui); overflow: hidden; }
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+.app {
+  position: relative; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+}
+.left { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.right { position: relative; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px;
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) 14px 14px; border-left: 1px solid var(--line); }   /* transparent: the canvas paints this half */
+#view3p { position: absolute; inset: 0; }
+
+/* left overlays */
+.hdr { position: absolute; top: 14px; left: max(16px, env(safe-area-inset-left, 0px)); right: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 7px 14px 7px 12px; display: grid; border-left: 3px solid var(--cyan); }
+.chip b { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.chip span { font: 500 12px/1.3 var(--f-mono); color: var(--cyan); }
+.btn { background: rgba(255, 255, 255, .07); border: 1px solid rgba(150, 190, 235, .35); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.btn:hover { background: rgba(255, 255, 255, .14); }
+.btn.on { background: rgba(76, 217, 255, .22); border-color: var(--cyan); }
+.btn.warn.on { background: rgba(255, 107, 107, .22); border-color: var(--safety); }
+.btn:focus-visible, .card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.cards { position: absolute; top: 76px; left: max(16px, env(safe-area-inset-left, 0px)); width: min(330px, 44%); display: grid; gap: 10px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.panel h4 { margin: 0 0 8px; font: 700 12px/1 var(--f-ui); letter-spacing: .08em; color: var(--dim); display: flex; justify-content: space-between; }
+.check { display: flex; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, .04); margin-top: 4px; font-size: 13px; color: var(--dim); }
+.check.run { color: var(--ink); } .check.ok { color: var(--ink); } .check.fail { color: var(--safety); }
+.check i { font-style: normal; font: 700 12px/1.4 var(--f-mono); }
+.check.ok i { color: var(--learn); } .check.fail i { color: var(--safety); } .check.run i { color: var(--runtime); }
+.summary div { font-size: 14px; padding: 2px 0; }
+
+.toasts { position: absolute; top: 76px; right: 16px; width: min(380px, 50%); display: grid; gap: 8px; }
+.toast { background: var(--panel); border: 1px solid var(--c); border-radius: 14px; padding: 9px 14px 10px 36px; position: relative; animation: tin .25s ease-out; }
+.toast::before { content: ""; position: absolute; left: 14px; top: 15px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 25%, transparent); }
+.toast b { display: block; font-size: 15px; }
+.toast span { color: var(--dim); font-size: 13px; }
+@keyframes tin { from { opacity: 0; transform: translateY(-8px); } }
+
+#viewMap { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 16px; width: min(300px, 38%); aspect-ratio: 7 / 6; border-radius: 12px; border: 1px solid var(--line); }
+.maptag { position: absolute; left: 8px; top: 6px; background: rgba(8, 14, 20, .8); padding: 4px 7px; border-radius: 6px; font: 700 11px/1 var(--f-ui); letter-spacing: .08em; color: var(--dim); }
+.caption { position: absolute; bottom: 16px; right: 16px; left: calc(min(300px, 38%) + 32px); background: var(--panel); border: 1px solid var(--acc, var(--cyan)); border-radius: 16px; padding: 12px 16px 12px 22px; transition: opacity .3s; }
+.caption::before { content: ""; position: absolute; left: 10px; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: var(--acc, var(--cyan)); }
+.caption b { display: block; font-size: 20px; line-height: 1.25; }
+.caption span { color: var(--dim); font-size: 14px; }
+.tag3d { position: absolute; transform: translate(-50%, -100%); background: rgba(8, 14, 20, .85); border: 1px solid var(--c); border-radius: 999px; padding: 3px 10px 3px 22px; font: 700 11px/1.4 var(--f-ui); white-space: nowrap; pointer-events: none; }
+.tag3d::before { content: ""; position: absolute; left: 8px; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+
+/* right side */
+.fp { position: relative; aspect-ratio: 16 / 10; max-height: 58vh; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); justify-self: center; }
+#viewFp { position: absolute; inset: 0; }
+#fpOverlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fphead { position: absolute; left: 10px; right: 10px; top: 8px; display: flex; justify-content: space-between; font: 700 12px/1 var(--f-ui); letter-spacing: .06em; text-shadow: 0 1px 2px #000; }
+.fphead .live::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--safety); margin-right: 6px; animation: blink 1.2s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.log { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.log h4 { margin: 0; padding: 10px 14px; font: 700 12px/1.2 var(--f-ui); letter-spacing: .08em; color: var(--dim); display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
+.log h4 em { font-style: normal; color: var(--acc, var(--dim)); }
+#logList { margin: 0; padding: 8px 10px; list-style: none; overflow-y: auto; min-height: 0; display: grid; align-content: start; gap: 4px; }
+#logList li { display: grid; grid-template-columns: 128px 52px minmax(0, 1fr); gap: 8px; align-items: start; padding: 3px 4px; border-radius: 6px; font-size: 14px; }
+#logList li:last-child { background: rgba(255, 255, 255, .05); }
+#logList .t { font: 700 11px/1.6 var(--f-mono); color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); border-radius: 5px; padding: 1px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#logList .ts { font: 500 11px/1.75 var(--f-mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+#logList .m { color: var(--mc, var(--ink)); overflow-wrap: anywhere; }
+
+/* start screen */
+.start { position: fixed; inset: 0; background: rgba(5, 9, 13, .86); display: grid; place-items: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); overflow-y: auto; z-index: 5; }
+.start .inner { max-width: 900px; width: 100%; display: grid; gap: 18px; text-align: center; }
+.start .eyebrow { font: 500 13px/1 var(--f-mono); letter-spacing: .1em; color: var(--cyan); }
+.start h1 { margin: 0; font-size: clamp(26px, 4vw, 42px); line-height: 1.15; text-wrap: balance; }
+.start p { margin: 0 auto; color: var(--dim); max-width: 62ch; }
+.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; text-align: left; }
+.card { background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .16); border-radius: 18px; padding: 18px 20px; cursor: pointer; display: grid; gap: 8px; }
+.card[aria-pressed="true"] { background: rgba(76, 217, 255, .12); border: 2px solid var(--cyan); }
+.card .k { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(255, 255, 255, .12); font: 700 14px/1 var(--f-mono); margin-right: 10px; }
+.card[aria-pressed="true"] .k { background: var(--cyan); color: #04121a; }
+.card h3 { margin: 0; font-size: 24px; display: flex; align-items: center; }
+.card .tl { color: var(--cyan); font-weight: 700; font-size: 14px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink); }
+.go { justify-self: center; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.go .btn { padding: 12px 22px; font-weight: 700; }
+.go .primary { background: rgba(76, 217, 255, .28); border-color: var(--cyan); }
+.keys { font: 500 12px/1 var(--f-mono); color: var(--dim); }
+
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .app { grid-template-columns: 1fr; grid-template-rows: 56vh auto; height: auto; min-height: 100%; }
+  .right { border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  .log { height: 46vh; }
+  .pick { grid-template-columns: 1fr; }
+  .caption b { font-size: 16px; }
+  #gl { position: absolute; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } .fphead .live::before { animation: none; } }
+</style>
+
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div class="app" id="app">
+  <div class="left">
+    <div id="view3p"></div>
+    <div class="hdr">
+      <div class="chip"><b id="robotName">Robot arm demo</b><span id="mission">Legacy control integration demo</span></div>
+      <button class="btn" id="bRun" type="button">Quick demo</button>
+      <button class="btn" id="bRobot" type="button">Robot</button>
+      <button class="btn warn" id="bHazard" type="button" aria-pressed="false">Hazard</button>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="toasts" id="toasts"></div>
+    <div id="tags"></div>
+    <div id="viewMap"><span class="maptag">FLOOR PLAN</span></div>
+    <div class="caption" id="caption" style="opacity:0"><b id="capH"></b><span id="capB"></span></div>
+  </div>
+  <div class="right">
+    <div class="fp" id="fpBox">
+      <div id="viewFp"></div>
+      <canvas id="fpOverlay"></canvas>
+      <div class="fphead"><span class="live">LIVE · FIRST-PERSON</span><span id="fpId">RAIL-01</span></div>
+    </div>
+    <div class="log" id="logBox">
+      <h4><span>PROCESS LOG</span><em id="now">mapping · wireless · physical · verify</em></h4>
+      <ul id="logList" aria-live="polite"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="start" id="start">
+  <div class="inner">
+    <span class="eyebrow">LG CLOiD · SOFTWARE ENGINEERING PHASE 2</span>
+    <h1>Bringing legacy controls into proactive routines</h1>
+    <p>Choose the robot for this run. Both run the same stages: find the switch, learn its light, and when the Wi-Fi plug fails, go and press it, then confirm by camera.</p>
+    <div class="pick">
+      <button class="card" id="cardCloid" type="button" data-robot="cloid" aria-pressed="false">
+        <h3><span class="k">1</span>CLOiD</h3>
+        <span class="tl">Life-like home robot with two arms</span>
+        <ul><li>Two articulated arms with IK reach</li><li>Round wheeled base, pan / tilt head camera</li><li>The arm presses the switch</li></ul>
+      </button>
+      <button class="card" id="cardTracked" type="button" data-robot="tracked" aria-pressed="true">
+        <h3><span class="k">2</span>Robot arm demo</h3>
+        <span class="tl">Tracked base, vertical rail and piston actuator</span>
+        <ul><li>Two tracks, one motor per track</li><li>Carriage rides a vertical rail to switch height</li><li>Piston rod extends straight ahead to press</li></ul>
+      </button>
+    </div>
+    <div class="go"><button class="btn primary" id="bStart" type="button">Start quick demo · ~20 s</button></div>
+    <span class="keys">1 / 2 choose robot · SPACE start · H hazard · M back here</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const C = { cyan: 0x4cd9ff, setup: "#6ea8ff", runtime: "#ffb84d", learn: "#5fe6a0", safety: "#ff6b6b", dim: "#93a3b2", ink: "#e8f0f6" };
+const STAGES = ["Recognize", "Map & verify", "Routine", "Trigger & intent", "Wireless control", "Physical fallback", "Learn"];
+const TAGS = { S1: "S1 Recognize", S2: "S2 Map & verify", S3: "S3 Routine", S4: "S4 Trigger", S5: "S5 Wireless", S6: "S6 Physical", S7: "S7 Learn", SAFE: "Safety Guard", SYS: "System" };
+const tagColor = (t) => t === "SAFE" ? C.safety : /S[123]/.test(t) ? C.setup : /S[456]/.test(t) ? C.runtime : t === "S7" ? C.learn : "#4cd9ff";
+const PACE = 0.75;
+
+// ------------------------------------------------------------------ renderer and scene
+const canvas = $("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a222b);
+
+const mat = (c, r = 0.6, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, emissive: e || 0x000000 });
+const M = {
+  floor: mat(0xb58a5c, 0.7), wall: mat(0xdcdad4, 0.9), wallDark: mat(0x3b4350, 0.85), rug: mat(0xe8e3da, 0.95),
+  sofa: mat(0x8796a8, 0.95), wood: mat(0x6b4a33, 0.5), oak: mat(0xc49a6c, 0.55), white: mat(0xf1f2f3, 0.35), pearl: mat(0xd6dbe2, 0.4, 0.2),
+  dark: mat(0x15191f, 0.3), base: mat(0x1d232b, 0.5), grey: mat(0x8a929c, 0.35, 0.6), stone: mat(0x2b2f36, 0.5), leaf: mat(0x2f6b3c, 0.6),
+  slate: mat(0x3d4552, 0.45), slateDark: mat(0x272d36, 0.45), motor: mat(0xc25e6b, 0.5), carriage: mat(0xe8c98b, 0.5), carEdge: mat(0xb38b40, 0.5),
+  rail: mat(0xd6dce6, 0.35, 0.5), railDark: mat(0x7f8a9a, 0.4, 0.5), housing: mat(0xcbd5e2, 0.4, 0.3), rod: mat(0xc98872, 0.35, 0.6),
+  rodTip: mat(0x8c5a46, 0.5), label: mat(0x5c84b3, 0.5), win: mat(0x1d3550, 0.2, 0, 0x0c1a2a),
+  led: new THREE.MeshStandardMaterial({ color: 0x1ab8e6, emissive: 0x2ad4ff, emissiveIntensity: 1.6, roughness: 0.3 }),
+  plate: mat(0xf4f4f2, 0.4), thermo: mat(0xe6e6e6, 0.4), thermoScreen: new THREE.MeshStandardMaterial({ color: 0x0a1420, emissive: 0x3a8fe0, emissiveIntensity: 0.5 }),
+  person: mat(0x5a6f8c, 0.8), skin: mat(0xd1b08f, 0.8),
+};
+function box(w, h, d, m, x, y, z, parent, cast = true) {
+  const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z);
+  o.castShadow = cast; o.receiveShadow = true; (parent || scene).add(o); return o;
+}
+function cyl(r, h, m, x, y, z, parent, axis, seg = 28) {
+  const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m); o.position.set(x, y, z);
+  if (axis === "x") o.rotation.z = Math.PI / 2; if (axis === "z") o.rotation.x = Math.PI / 2;
+  o.castShadow = true; o.receiveShadow = true; (parent || scene).add(o); return o;
+}
+function ball(r, m, x, y, z, parent) { const o = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), m); o.position.set(x, y, z); o.castShadow = true; (parent || scene).add(o); return o; }
+
+// lights: dusk ambience, so the living lights read clearly when they come on
+scene.add(new THREE.HemisphereLight(0xaebfd6, 0x3a3029, 0.36));
+const sky = new THREE.DirectionalLight(0xc8d6ff, 0.42);
+sky.position.set(-4, 9, 7); sky.castShadow = true; sky.shadow.mapSize.set(2048, 2048);
+Object.assign(sky.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 25 }); sky.shadow.bias = -0.0005;
+sky.target.position.set(3.5, 0, 3); scene.add(sky, sky.target);
+
+// ------------------------------------------------------------------ the room (x 0..7, z 0..6, open to the front)
+const RW = 7, RD = 6, H = 2.7;
+box(RW, 0.04, RD, M.floor, RW / 2, -0.02, RD / 2).castShadow = false;
+box(RW, H, 0.1, M.wall, RW / 2, H / 2, -0.05);                // back wall
+box(0.1, H, RD, M.wall, -0.05, H / 2, RD / 2);                // left wall
+box(0.1, H, RD, M.wall, RW + 0.05, H / 2, RD / 2);            // right wall (switch wall)
+box(2.4, 1.3, 0.02, M.win, 2.0, 1.45, 0.01, null, false);     // window
+box(2.5, 0.06, 0.06, M.stone, 2.0, 0.78, 0.04);
+// furniture
+box(3.0, 0.01, 2.0, M.rug, 3.4, 0.005, 3.2).castShadow = false;
+const sofa = new THREE.Group(); sofa.position.set(1.0, 0, 3.2); scene.add(sofa);
+box(0.9, 0.42, 2.2, M.sofa, 0, 0.21, 0, sofa); box(0.22, 0.8, 2.2, M.sofa, -0.34, 0.4, 0, sofa);
+box(0.9, 0.58, 0.2, M.sofa, 0, 0.29, -1.1, sofa); box(0.9, 0.58, 0.2, M.sofa, 0, 0.29, 1.1, sofa);
+cyl(0.42, 0.06, M.wood, 2.6, 0.4, 3.2); cyl(0.05, 0.38, M.stone, 2.6, 0.2, 3.2);
+box(1.8, 0.92, 0.7, M.white, 2.0, 0.46, 0.45); box(1.9, 0.04, 0.78, M.stone, 2.0, 0.94, 0.45);          // kitchen run
+// dining table with four chairs (seat, back, legs)
+box(0.8, 0.04, 1.4, M.oak, 4.9, 0.74, 0.9); for (const [dx, dz] of [[-0.35, -0.6], [0.35, -0.6], [-0.35, 0.6], [0.35, 0.6]]) cyl(0.025, 0.72, M.wood, 4.9 + dx, 0.36, 0.9 + dz);
+for (const [sx, dz] of [[-1, -0.35], [-1, 0.35], [1, -0.35], [1, 0.35]]) {
+  const ch = new THREE.Group(); ch.position.set(4.9 + sx * 0.62, 0, 0.9 + dz); ch.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2; scene.add(ch);
+  box(0.42, 0.04, 0.42, M.wood, 0, 0.45, 0, ch); box(0.42, 0.42, 0.03, M.wood, 0, 0.68, -0.2, ch);
+  for (const [lx, lz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) cyl(0.015, 0.45, M.stone, lx, 0.225, lz, ch, null, 8);
+}
+cyl(0.18, 0.32, M.stone, 6.6, 0.16, 0.45); ball(0.38, M.leaf, 6.6, 0.75, 0.45);                          // plant
+cyl(0.02, 1.5, M.stone, 0.35, 0.75, 5.4); const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.3, 24, 1, true), M.white); shade.position.set(0.35, 1.6, 5.4); scene.add(shade);
+box(0.5, 0.45, 1.6, M.wood, 0.25, 0.225, 1.6);                                                            // console
+
+// living-room pendants: the lights SW-01 controls
+const lamps = [];
+[[2.4, 2.4], [3.4, 3.2], [4.4, 4.0]].forEach(([x, z]) => {
+  cyl(0.006, H - 2.15, M.dark, x, (H + 2.15) / 2, z);
+  const m = new THREE.MeshStandardMaterial({ color: 0xf6efe2, emissive: 0xffc977, emissiveIntensity: 0, roughness: 0.4, side: THREE.DoubleSide });
+  const s = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.22, 28, 1, true), m); s.position.set(x, 2.05, z); scene.add(s);
+  const l = new THREE.PointLight(0xffcf8a, 0, 7, 1.6); l.position.set(x, 1.9, z); scene.add(l);
+  lamps.push({ m, l });
+});
+let lampLevel = 0;
+function setLamps(v) { lampLevel = v; lamps.forEach(({ m, l }) => { m.emissiveIntensity = 1.6 * v; l.intensity = 1.05 * v; }); }
+
+// dock
+cyl(0.36, 0.02, M.slate, 5.2, 0.01, 5.2); box(0.3, 0.5, 0.06, M.white, 5.2, 0.25, 5.55); box(0.04, 0.3, 0.01, M.led, 5.2, 0.28, 5.52, null, false);
+
+// ------------------------------------------------------------------ the wall controls
+function control(id, kind, x, y, z) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = -Math.PI / 2; scene.add(g);   // local +z faces into the room (-x)
+  const c = { id, kind, g, status: "Unseen", visTime: 0, conf: 0, on: false, normal: new THREE.Vector3(-1, 0, 0) };
+  if (kind === "decoy") {
+    box(0.1, 0.1, 0.022, M.thermo, 0, 0, 0.011, g); box(0.062, 0.04, 0.002, M.thermoScreen, 0, 0.004, 0.0225, g, false);
+    c.size = [0.1, 0.1];
+  } else {
+    box(0.086, 0.124, 0.012, M.plate, 0, 0, 0.006, g);
+    c.rocker = new THREE.Group(); c.rocker.position.set(0, 0, 0.012); g.add(c.rocker);
+    box(0.04, 0.066, 0.012, M.plate, 0, 0, 0.006, c.rocker); c.rocker.rotation.x = 0.14;
+    c.ledMat = new THREE.MeshStandardMaterial({ color: 0x334048, emissive: 0x000000 }); box(0.006, 0.006, 0.004, c.ledMat, 0.028, 0.048, 0.013, g, false);
+    c.size = [0.086, 0.124];
+  }
+  c.world = (lx, ly, lz) => g.localToWorld(new THREE.Vector3(lx, ly, lz));
+  c.surface = () => c.world(0, 0, 0.02);
+  c.tip = (on, off = 0) => c.world(0, on ? 0.016 : -0.016, 0.013 + off);
+  c.corners = () => { const [w, h] = c.size, r = []; for (const sx of [-1, 1]) for (const sy of [-1, 1]) r.push(c.world(sx * w / 2, sy * h / 2, 0.012)); return r; };
+  return c;
+}
+const sw = control("SW-01", "rocker", RW - 0.0, 1.25, 3.0);
+const decoy = control("PN-X", "decoy", RW - 0.0, 1.5, 3.6);
+const controls = [sw, decoy];
+// rocker: top pressed in (negative x rotation) = on
+function setSwitch(on) { sw.on = on; const a0 = sw.rocker.rotation.x, a1 = on ? -0.14 : 0.14; tween(0.18, (k) => { sw.rocker.rotation.x = a0 + (a1 - a0) * k; }); sw.ledMat.emissive.setHex(on ? 0x2ad4ff : 0x000000); }
+sw.rocker.rotation.x = 0.14;
+// the Wi-Fi smart plug that feeds the living lights
+const plug = box(0.07, 0.09, 0.05, mat(0xf2f2f2, 0.4, 0, 0x000000), RW - 0.03, 0.32, 2.2); plug.rotation.y = -Math.PI / 2;
+
+// person for the hazard check
+const person = new THREE.Group(); scene.add(person); person.visible = false;
+{ const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.9, 6, 16), M.person); b.position.y = 0.75; b.castShadow = true; person.add(b); ball(0.12, M.skin, 0, 1.58, 0, person); }
+
+// ------------------------------------------------------------------ tweens and timing
+const tweens = [];
+let clock = 0;
+function tween(dur, fn, ease = (k) => k * k * (3 - 2 * k)) {
+  return new Promise((res) => { const t = { t: 0, dur: Math.max(dur, 1e-4), fn, ease, res }; tweens.push(t); });
+}
+function stepTweens(dt) {
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const t = tweens[i]; t.t += dt; const k = Math.min(1, t.t / t.dur);
+    t.fn(t.ease(k)); if (k >= 1) { tweens.splice(i, 1); t.res(); }
+  }
+}
+let runId = 0;
+class Cancel extends Error {}
+function guard(id) { if (id !== runId) throw new Cancel(); }
+const wait = (s, id) => tween(s * PACE, () => {}).then(() => guard(id));
+
+// ------------------------------------------------------------------ robots
+const UP = new THREE.Vector3(0, 1, 0);
+function makeTracked() {
+  const R = { kind: "tracked", name: "Robot arm demo", unit: "RAIL-01", lateral: 0, root: new THREE.Group(), wheels: [] };
+  const g = R.root;
+  // base: two tracks with road wheels, hull, deck, battery + Pi, motors
+  for (const sx of [-1, 1]) {
+    const t = new THREE.Group(); t.position.x = sx * 0.225; g.add(t);
+    box(0.1, 0.22, 0.38, M.slateDark, 0, 0.11, 0, t); cyl(0.11, 0.1, M.slateDark, 0, 0.11, 0.19, t, "x"); cyl(0.11, 0.1, M.slateDark, 0, 0.11, -0.19, t, "x");
+    for (const z of [-0.19, -0.065, 0.065, 0.19]) {
+      const w = new THREE.Group(); w.position.set(sx * 0.052, 0.11, z); t.add(w);
+      cyl(z === 0.19 || z === -0.19 ? 0.07 : 0.045, 0.012, M.rail, 0, 0, 0, w, "x"); box(0.014, 0.012, z === 0.19 || z === -0.19 ? 0.12 : 0.08, M.railDark, 0, 0, 0, w);
+      R.wheels.push(w);
+    }
+  }
+  box(0.33, 0.16, 0.5, M.slateDark, 0, 0.15, 0, g);
+  box(0.56, 0.03, 0.6, M.slate, 0, 0.245, 0, g);
+  box(0.4, 0.012, 0.004, M.led, 0, 0.245, 0.302, g, false);
+  box(0.1, 0.04, 0.07, M.motor, -0.17, 0.28, 0.24, g);
+  box(0.26, 0.07, 0.22, M.slate, 0, 0.295, -0.02, g); box(0.16, 0.03, 0.004, M.label, 0, 0.295, 0.091, g, false);
+  box(0.09, 0.035, 0.09, M.railDark, 0, 0.347, -0.02, g);
+  box(0.045, 1.26, 0.045, M.rail, 0, 0.36 + 0.63, -0.02, g); box(0.055, 0.02, 0.055, M.railDark, 0, 1.63, -0.02, g);
+  // carriage with the piston actuator, webcam on top
+  const car = new THREE.Group(); car.position.set(0, 1.12, -0.01); g.add(car);
+  box(0.13, 0.11, 0.12, M.carriage, 0, 0, 0, car); box(0.135, 0.008, 0.125, M.carEdge, 0, -0.058, 0, car);
+  box(0.08, 0.065, 0.08, M.motor, 0, 0, 0.10, car);
+  cyl(0.032, 0.30, M.housing, 0, 0, 0.29, car, "z"); for (const z of [0.22, 0.30, 0.38]) cyl(0.0335, 0.005, M.railDark, 0, 0, z, car, "z");
+  const rod = new THREE.Group(); rod.position.z = 0.44; car.add(rod);
+  cyl(0.011, 0.42, M.rod, 0, 0, -0.21, rod, "z"); cyl(0.016, 0.02, M.rodTip, 0, 0, 0.01, rod, "z");
+  const head = new THREE.Group(); head.position.set(0, 0.055, 0.01); car.add(head);
+  box(0.1, 0.045, 0.07, M.slateDark, 0, 0.0225, 0, head); ball(0.013, M.led, 0, 0.0225, 0.036, head);
+  R.eye = new THREE.Object3D(); R.eye.position.set(0, 0.0225, 0.05); head.add(R.eye);
+  R.head = head; R.car = car; R.rod = rod; R.carY = 1.12; R.ext = 0;
+  R.restCar = 1.12;
+  R.press = async (c, on, id) => {
+    const touch = c.tip(on, -0.006);
+    await faceTo(touch, id);
+    const ty = touch.y;
+    const y0 = R.carY;
+    await tween(0.9 * 0.85, (k) => { R.car.position.y = y0 + (ty - y0) * k; }); R.carY = ty; guard(id);
+    const reach = R.root.worldToLocal(touch.clone()).z - (-0.01 + 0.44 + 0.02);
+    await moveRod(reach - 0.05, 0.6 * 0.85); guard(id);
+    await moveRod(reach, 0.25 * 0.85); guard(id);
+    setSwitch(on); return async () => { await moveRod(0, 0.5 * 0.85); await tween(0.8 * 0.85, (k) => { R.car.position.y = ty + (R.restCar - ty) * k; }); R.carY = R.restCar; };
+  };
+  function moveRod(to, dur) { to = Math.max(0, Math.min(0.40, to)); const e0 = R.ext; return tween(dur, (k) => { R.ext = e0 + (to - e0) * k; R.rod.position.z = 0.44 + R.ext; }); }
+  R.relax = () => { R.ext = 0; R.rod.position.z = 0.44; R.carY = R.restCar; R.car.position.y = R.restCar; };
+  R.headBase = () => R.head.getWorldPosition(new THREE.Vector3());
+  return R;
+}
+
+function makeCloid() {
+  const R = { kind: "cloid", name: "CLOiD", unit: "CLOiD-01", lateral: 0.262, root: new THREE.Group(), wheels: [] };
+  const g = R.root;
+  cyl(0.31, 0.17, M.base, 0, 0.085, 0, g, null, 48);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.322, 0.007, 8, 64), M.led); ring.rotation.x = Math.PI / 2; ring.position.y = 0.14; g.add(ring);
+  const body = new THREE.Group(); g.add(body); R.body = body;
+  const prof = [[0, 0.165], [0.262, 0.165], [0.238, 0.30], [0.208, 0.46], [0.196, 0.62], [0.208, 0.80], [0.226, 0.98], [0.232, 1.10], [0.215, 1.16], [0.12, 1.175], [0, 1.18]].map(([r, y]) => new THREE.Vector2(r, y));
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), M.white); torso.scale.z = 0.72; torso.castShadow = true; body.add(torso);
+  const panel = box(0.24, 0.17, 0.01, M.dark, 0, 0.9, 0.163, body); panel.rotation.x = -0.05;
+  box(0.2, 0.008, 0.004, M.led, 0, 0.83, 0.171, body, false);
+  cyl(0.05, 0.11, M.dark, 0, 1.175, 0, body);
+  const head = new THREE.Group(); head.position.set(0, 1.22, 0); body.add(head);
+  const hs = ball(0.176, M.white, 0, 0.12, 0, head); hs.scale.set(1, 0.74, 0.8);
+  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.178, 32, 16, Math.PI * 0.18, Math.PI * 0.64, Math.PI * 0.3, Math.PI * 0.38), M.dark); visor.position.y = 0.12; visor.scale.set(1, 0.74, 0.8); head.add(visor);
+  for (const sx of [-1, 1]) { const e = cyl(0.011, 0.05, M.led, sx * 0.05, 0.12, 0.142, head); }
+  for (const sx of [-1, 1]) cyl(0.04, 0.016, M.grey, sx * 0.178, 0.11, 0, head, "x");
+  R.eye = new THREE.Object3D(); R.eye.position.set(0, 0.216, 0.135); head.add(R.eye); R.head = head;
+  // arms (right arm on the robot's right = local -x), limbs hang along -y
+  R.arms = [];
+  for (const side of [1, -1]) {             // +1 right, -1 left
+    const a = { side, w: 0, tip: new THREE.Vector3() };
+    a.upper = new THREE.Group(); a.upper.position.set(-side * 0.262, 1.075, 0); body.add(a.upper);
+    ball(0.074, M.grey, 0, 0, 0, a.upper); cyl(0.045, 0.38, M.white, 0, -0.21, 0, a.upper);
+    a.fore = new THREE.Group(); a.fore.position.y = -0.40; a.upper.add(a.fore);
+    ball(0.047, M.grey, 0, 0, 0, a.fore); cyl(0.036, 0.34, M.pearl, 0, -0.19, 0, a.fore); cyl(0.038, 0.04, M.dark, 0, -0.355, 0, a.fore);
+    a.hand = new THREE.Group(); a.hand.position.y = -0.38; a.fore.add(a.hand);
+    box(0.06, 0.09, 0.045, M.white, 0, -0.045, 0, a.hand); cyl(0.009, 0.06, M.white, 0.012, -0.11, 0.01, a.hand);
+    R.arms.push(a);
+  }
+  const [right] = R.arms;
+  const L1 = 0.40, L2 = 0.38, LH = 0.13;
+  const v = () => new THREE.Vector3(), q = new THREE.Quaternion(), pq = new THREE.Quaternion();
+  function aim(obj, dirWorld) {        // point the limb's -y along dirWorld
+    q.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dirWorld.clone().normalize());
+    obj.parent.getWorldQuaternion(pq); obj.quaternion.copy(pq.invert().multiply(q));
+  }
+  R.solve = () => {
+    for (const a of R.arms) {
+      if (a.w < 0.001) { a.upper.quaternion.identity(); a.fore.quaternion.identity(); a.hand.quaternion.identity(); continue; }
+      a.upper.quaternion.identity(); a.fore.quaternion.identity(); a.hand.quaternion.identity();
+      const S = a.upper.getWorldPosition(v());
+      const rest = S.clone().add(new THREE.Vector3(0, -(L1 + L2 + LH), 0));
+      const F = rest.clone().lerp(a.tip, a.w);
+      const d0 = F.clone().sub(S); const dir0 = d0.clone().normalize();
+      const W = F.clone().addScaledVector(dir0, -LH);
+      const dw = W.clone().sub(S); const d = Math.min(Math.max(dw.length(), 0.22), L1 + L2 - 0.004); const dir = dw.normalize();
+      const bodyRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(R.root.quaternion);
+      const pole = bodyRight.multiplyScalar(a.side * 0.9).add(new THREE.Vector3(0, -0.7, 0)); pole.addScaledVector(dir, -pole.dot(dir)).normalize();
+      const cosA = Math.min(1, Math.max(-1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+      const E = S.clone().addScaledVector(dir, L1 * cosA).addScaledVector(pole, L1 * sinA);
+      const W2 = S.clone().addScaledVector(dir, d);
+      aim(a.upper, E.clone().sub(S)); a.upper.updateMatrixWorld(true);
+      aim(a.fore, W2.clone().sub(E)); a.fore.updateMatrixWorld(true);
+      aim(a.hand, F.clone().sub(W2));
+    }
+  };
+  const fingertip = (a) => a.hand.localToWorld(new THREE.Vector3(0, -LH, 0));
+  function moveArm(a, to, dur, w0, w1) { const from = a.tip.clone(); return tween(dur, (k) => { a.tip.copy(from).lerp(to, k); a.w = w0 + (w1 - w0) * k; }); }
+  R.press = async (c, on, id) => {
+    const pre = c.tip(on, 0.20), near = c.tip(on, 0.05), touch = c.tip(on, -0.006);
+    right.tip.copy(fingertip(right));
+    await moveArm(right, pre, 1.0, 0, 1); guard(id);
+    await moveArm(right, near, 0.5, 1, 1); guard(id);
+    await moveArm(right, touch, 0.3, 1, 1); guard(id);
+    setSwitch(on);
+    return async () => { await moveArm(right, near, 0.35, 1, 1); await moveArm(right, pre, 0.4, 1, 1); await moveArm(right, pre, 0.8, 1, 0); right.w = 0; };
+  };
+  R.relax = () => R.arms.forEach((a) => { a.w = 0; });
+  return R;
+}
+
+const robots = { tracked: makeTracked(), cloid: makeCloid() };
+let robot = robots.tracked;
+for (const r of Object.values(robots)) { r.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } }); }
+const marker = new THREE.Mesh(new THREE.CircleGeometry(0.22, 24), new THREE.MeshBasicMaterial({ color: C.cyan })); marker.rotation.x = -Math.PI / 2; marker.position.y = 2.9; marker.layers.set(1); scene.add(marker);
+const swMark = new THREE.Mesh(new THREE.CircleGeometry(0.12, 20), new THREE.MeshBasicMaterial({ color: 0x8a96a3 })); swMark.rotation.x = -Math.PI / 2; swMark.position.set(RW - 0.15, 2.9, 3.0); swMark.layers.set(1); scene.add(swMark);
+
+const state = { yaw: 0, look: null, headYaw: 0, headPitch: 0, speed: 0 };
+function useRobot(kind) {
+  scene.remove(robot.root); robot = robots[kind]; scene.add(robot.root);
+  $("robotName").textContent = robot.name; $("fpId").textContent = robot.unit;
+  for (const c of document.querySelectorAll(".card")) c.setAttribute("aria-pressed", String(c.dataset.robot === kind));
+  try { localStorage.setItem("webdemo-robot", kind); } catch (e) {}
+}
+function place(x, z, yaw) { robot.root.position.set(x, 0, z); state.yaw = yaw; robot.root.rotation.y = yaw; }
+const fwd = () => new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+const angleTo = (p) => Math.atan2(p.x - robot.root.position.x, p.z - robot.root.position.z);
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+async function turnTo(yaw, id) {
+  const y0 = state.yaw, dy = wrap(yaw - y0); const dur = Math.max(0.15, Math.abs(dy) / 2.4);
+  await tween(dur, (k) => { state.yaw = y0 + dy * k; robot.root.rotation.y = state.yaw; spinWheels(dy * 0.225 * (k - (spinWheels.k || 0))); spinWheels.k = k; }); spinWheels.k = 0; guard(id);
+}
+function spinWheels(dist) { for (const w of robot.wheels) w.rotation.x += dist / 0.07; }
+async function faceTo(p, id) { await turnTo(angleTo(p), id); }
+async function driveTo(x, z, id) {
+  await turnTo(Math.atan2(x - robot.root.position.x, z - robot.root.position.z), id);
+  const p0 = robot.root.position.clone(), p1 = new THREE.Vector3(x, 0, z), dist = p0.distanceTo(p1);
+  let last = 0;
+  await tween(Math.max(0.3, dist / 0.9), (k) => { robot.root.position.lerpVectors(p0, p1, k); spinWheels((k - last) * dist); last = k; }); guard(id);
+}
+
+// ------------------------------------------------------------------ cameras
+const cam3p = new THREE.PerspectiveCamera(52, 1, 0.05, 60);
+const camFp = new THREE.PerspectiveCamera(62, 1.6, 0.03, 30);
+const camMap = new THREE.OrthographicCamera(-RW / 2 - 0.2, RW / 2 + 0.2, RD / 2 + 0.2, -RD / 2 - 0.2, 0.1, 20);
+camMap.position.set(RW / 2, 10, RD / 2); camMap.up.set(0, 0, -1); camMap.lookAt(RW / 2, 0, RD / 2); camMap.layers.enable(1);
+let camMode = "chase", camGlance = null;
+const camPos = new THREE.Vector3(3, 4, 9), camLook = new THREE.Vector3(4, 1, 3);
+function updateCams(dt) {
+  const rp = robot.root.position, f = fwd(), r = new THREE.Vector3(-f.z, 0, f.x).multiplyScalar(-1);   // robot's right in world
+  let p, l;
+  if (camGlance) { p = camGlance.p; l = camGlance.l; }
+  else if (camMode === "close") {
+    p = rp.clone().addScaledVector(r, -2.1).addScaledVector(f, -0.35).add(new THREE.Vector3(0, 1.7, 0));
+    l = rp.clone().addScaledVector(f, 0.4).add(new THREE.Vector3(0, 1.0, 0));
+  } else {
+    p = rp.clone().addScaledVector(f, -2.6).addScaledVector(r, -1.1).add(new THREE.Vector3(0, 2.3, 0));
+    l = rp.clone().addScaledVector(f, 1.2).add(new THREE.Vector3(0, 0.8, 0));
+  }
+  const k = 1 - Math.exp(-3 * dt);
+  camPos.lerp(p, k); camLook.lerp(l, k);
+  cam3p.position.copy(camPos); cam3p.lookAt(camLook);
+  // head / camera mount pan and tilt
+  let ty = Math.sin(clock * 0.45) * 0.04, tp = 0.07;
+  if (state.look) {
+    const hp = robot.head.getWorldPosition(new THREE.Vector3());
+    const d = state.look.clone().sub(hp);
+    ty = wrap(Math.atan2(d.x, d.z) - state.yaw); tp = -Math.atan2(d.y, Math.hypot(d.x, d.z));
+  }
+  ty = Math.max(-1.4, Math.min(1.4, ty)); tp = Math.max(-0.5, Math.min(0.65, tp));
+  const hk = 1 - Math.exp(-7 * dt);
+  state.headYaw += (ty - state.headYaw) * hk; state.headPitch += (tp - state.headPitch) * hk;
+  robot.head.rotation.set(state.headPitch, state.headYaw, 0, "YXZ");
+  robot.root.updateMatrixWorld(true);
+  if (robot.solve) robot.solve();
+  robot.eye.updateMatrixWorld(true);
+  robot.eye.getWorldPosition(camFp.position); robot.eye.getWorldQuaternion(camFp.quaternion);
+  camFp.rotateY(Math.PI);   // three.js cameras look down -z; the eye looks along +z
+  marker.position.x = rp.x; marker.position.z = rp.z;
+}
+
+// ------------------------------------------------------------------ perception (first-person camera)
+const ndc = new THREE.Vector3();
+function perceive(dt) {
+  for (const c of controls) {
+    const p = c.surface(); ndc.copy(p).project(camFp);
+    const toCam = camFp.position.clone().sub(p); const dist = toCam.length(); toCam.normalize();
+    const facing = c.normal.dot(toCam);
+    c.vis = ndc.z < 1 && Math.abs(ndc.x) < 0.92 && Math.abs(ndc.y) < 0.9 && dist < 7.5 && facing > 0.3;
+    const target = c.kind === "decoy" ? 0.37 : Math.min(0.96, 0.6 + 0.36 * Math.min(1, 2.2 / dist));
+    c.conf += ((c.vis ? target : 0) - c.conf) * (1 - Math.exp(-8 * dt));
+    c.visTime = c.vis && c.conf > (c.kind === "decoy" ? 0.3 : 0.8) ? c.visTime + dt : Math.max(0, c.visTime - dt * 1.5);
+  }
+}
+
+// ------------------------------------------------------------------ overlays
+const ov = $("fpOverlay"), ctx = ov.getContext("2d");
+function drawFp() {
+  const r = ov.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  if (ov.width !== Math.round(r.width * dpr)) { ov.width = Math.round(r.width * dpr); ov.height = Math.round(r.height * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
+  const W = r.width, Hh = r.height;
+  ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 2;
+  const L = 18, m = 10; for (const [x, y, sx, sy] of [[m, m, 1, 1], [W - m, m, -1, 1], [m, Hh - m, 1, -1], [W - m, Hh - m, -1, -1]]) { ctx.beginPath(); ctx.moveTo(x + sx * L, y); ctx.lineTo(x, y); ctx.lineTo(x, y + sy * L); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W / 2 - 9, Hh / 2); ctx.lineTo(W / 2 + 9, Hh / 2); ctx.moveTo(W / 2, Hh / 2 - 9); ctx.lineTo(W / 2, Hh / 2 + 9); ctx.stroke();
+  ctx.font = "700 12px " + getComputedStyle(document.body).getPropertyValue("--f-ui");
+  for (const c of controls) {
+    if (!c.vis || c.conf < (c.kind === "decoy" ? 0.22 : 0.4)) continue;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const w of c.corners()) { ndc.copy(w).project(camFp); const x = (ndc.x + 1) / 2 * W, y = (1 - ndc.y) / 2 * Hh; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    let pad = 6; if (c.kind !== "decoy" && c.status === "Unseen") pad += 12 * (1 - Math.min(1, c.visTime / 0.55));
+    x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+    let col, label;
+    if (c.kind === "decoy") { col = "#ff8a80"; label = "WALL PANEL  " + c.conf.toFixed(2) + "  REJECT"; }
+    else if (c.status === "Unseen") { col = "#ffffff"; label = "ANALYZING…  " + c.conf.toFixed(2); }
+    else { col = c.status === "Verified" ? C.learn : c.status === "In routine" ? "#4cd9ff" : C.setup; label = "ROCKER SWITCH  " + Math.max(c.conf, 0.95).toFixed(2); }
+    const bl = Math.min(16, (x1 - x0) * 0.35); ctx.strokeStyle = col; ctx.lineWidth = c.kind === "decoy" ? 1.5 : 2.5; ctx.beginPath();
+    for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.moveTo(x + sx * bl, y); ctx.lineTo(x, y); ctx.lineTo(x, y + sy * bl); }
+    ctx.stroke();
+    const tw = ctx.measureText(label).width + 14, lx = Math.max(4, Math.min(W - tw - 4, x0)), ly = Math.max(4, y0 - 24);
+    ctx.fillStyle = "rgba(6,12,18,.85)"; ctx.fillRect(lx, ly, tw, 19); ctx.fillStyle = col; ctx.fillText(label, lx + 7, ly + 14);
+    if (c.kind !== "decoy" && c.status !== "Unseen") ctx.fillText(c.id + " · Living room", x0, y1 + 16);
+  }
+  if (cvChip && clock < cvChip.until) {
+    ctx.fillStyle = "rgba(6,12,18,.85)"; const t = cvChip.text, tw = ctx.measureText(t).width + 18; ctx.fillRect(W - tw - 12, Hh - 34, tw, 22); ctx.fillStyle = cvChip.col; ctx.fillText(t, W - tw - 3, Hh - 19);
+  }
+}
+let cvChip = null;
+
+const tagsEl = $("tags"), leftEl = document.querySelector(".left");
+function drawTags() {
+  tagsEl.innerHTML = "";
+  if (sw.status === "Unseen") return;
+  const r3 = $("view3p").getBoundingClientRect(), lr = leftEl.getBoundingClientRect();
+  ndc.copy(sw.world(0, 0.16, 0.05)).project(cam3p);
+  if (ndc.z > 1 || Math.abs(ndc.x) > 0.95 || Math.abs(ndc.y) > 0.95) return;
+  const el = document.createElement("div"); el.className = "tag3d";
+  el.style.setProperty("--c", sw.status === "Verified" ? C.learn : sw.status === "In routine" ? "#4cd9ff" : C.setup);
+  el.textContent = "SW-01  Living lights";
+  el.style.left = (r3.left - lr.left + (ndc.x + 1) / 2 * r3.width) + "px"; el.style.top = (r3.top - lr.top + (1 - ndc.y) / 2 * r3.height) + "px";
+  tagsEl.appendChild(el);
+}
+
+// link arc between the switch and the lights, and Wi-Fi rings at the plug
+const arcMat = new THREE.LineDashedMaterial({ color: 0x6ea8ff, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.95 });
+let arc = null;
+function showArc(col) {
+  hideArc(); const a = sw.surface(), b = new THREE.Vector3(3.4, 2.05, 3.2), pts = [];
+  for (let i = 0; i <= 40; i++) { const t = i / 40, p = a.clone().lerp(b, t); p.y += Math.sin(t * Math.PI) * 0.9; pts.push(p); }
+  arcMat.color.set(col); arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), arcMat); arc.computeLineDistances(); scene.add(arc);
+}
+function hideArc() { if (arc) { scene.remove(arc); arc.geometry.dispose(); arc = null; } }
+async function wifiRings(fail) {
+  const ms = [];
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.008, 6, 40), new THREE.MeshBasicMaterial({ color: 0x4cd9ff, transparent: true }));
+    m.position.copy(plug.position).add(new THREE.Vector3(-0.05, 0.1, 0)); m.rotation.y = Math.PI / 2; scene.add(m); ms.push(m);
+  }
+  await tween(1.1 * PACE, (k) => ms.forEach((m, i) => { const kk = Math.max(0, Math.min(1, k * 1.6 - i * 0.3)); m.scale.setScalar(1 + kk * 4); m.material.opacity = 1 - kk; }));
+  ms.forEach((m) => { scene.remove(m); m.geometry.dispose(); });
+  if (fail) { plug.material.emissive.setHex(0xff3030); await tween(0.5, () => {}); plug.material.emissive.setHex(0x000000); }
+}
+
+// ------------------------------------------------------------------ HUD text
+let t0 = 0;
+const logEl = $("logList");
+function stamp() { const t = clock - t0; return String(Math.floor(t / 60)).padStart(2, "0") + ":" + (t % 60).toFixed(1).padStart(4, "0"); }
+function log(tag, text, col) {
+  const li = document.createElement("li"); li.style.setProperty("--c", tagColor(tag)); if (col) li.style.setProperty("--mc", col);
+  li.innerHTML = '<span class="t"></span><span class="ts"></span><span class="m"></span>';
+  li.children[0].textContent = TAGS[tag] || tag; li.children[1].textContent = stamp(); li.children[2].textContent = text;
+  logEl.appendChild(li); logEl.scrollTop = logEl.scrollHeight;
+}
+function stage(i) {
+  const n = $("now");
+  if (i < 0) { n.textContent = "mapping · wireless · physical · verify"; n.parentElement.style.removeProperty("--acc"); return; }
+  n.textContent = "Now: S" + (i + 1) + " · " + STAGES[i];
+  n.parentElement.parentElement.style.setProperty("--acc", i < 3 ? C.setup : i < 6 ? C.runtime : C.learn);
+  $("caption").style.setProperty("--acc", i < 3 ? C.setup : i < 6 ? C.runtime : C.learn);
+}
+function say(h, b) { const c = $("caption"); $("capH").textContent = h; $("capB").textContent = b; c.style.opacity = 1; }
+function toast(title, body, col, dur = 2.6) {
+  const el = document.createElement("div"); el.className = "toast"; el.style.setProperty("--c", col);
+  el.innerHTML = "<b></b><span></span>"; el.children[0].textContent = title; el.children[1].textContent = body;
+  const box = $("toasts"); box.appendChild(el); while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => el.remove(), dur * 1000);
+}
+function safetyCard(rows) {
+  const p = document.createElement("div"); p.className = "panel"; p.innerHTML = "<h4><span>SAFETY GUARD</span><span>R1 · lighting</span></h4>";
+  const els = rows.map((t) => { const d = document.createElement("div"); d.className = "check"; d.innerHTML = "<span></span><i>·</i>"; d.children[0].textContent = t; p.appendChild(d); return d; });
+  $("cards").appendChild(p); return { p, els };
+}
+
+// ------------------------------------------------------------------ the quick demo
+let hazard = false, running = false;
+const counts = { wOk: 0, wFail: 0, phys: 0, cancel: 0 };
+function resetWorld() {
+  runId++; tweens.length = 0;
+  logEl.innerHTML = ""; $("cards").innerHTML = ""; $("toasts").innerHTML = ""; $("caption").style.opacity = 0; stage(-1);
+  for (const c of controls) { c.status = "Unseen"; c.visTime = 0; c.conf = 0; }
+  setLamps(0); sw.on = false; sw.rocker.rotation.x = 0.14; sw.ledMat.emissive.setHex(0); hideArc();
+  robot.relax(); state.look = null; camMode = "chase"; camGlance = null; cvChip = null;
+  Object.assign(counts, { wOk: 0, wFail: 0, phys: 0, cancel: 0 });
+  // start in the living room, 1.5 m from the switch, facing it
+  const n = sw.normal, start = sw.g.position.clone().addScaledVector(n, 1.5);
+  place(start.x, start.z, Math.atan2(-n.x, -n.z));
+  person.visible = false; running = false; $("bRun").textContent = "Quick demo"; $("bRun").classList.remove("on");
+  t0 = clock;
+}
+
+async function quickDemo() {
+  resetWorld(); const id = runId; running = true; $("bRun").textContent = "Stop"; $("bRun").classList.add("on");
+  try {
+    say("Quick demo · " + robot.name, "Learn a switch, then keep the routine working when Wi-Fi fails.");
+    await wait(1.0, id);
+
+    // S1: recognise the switch
+    stage(0); say("S1 · Recognize", "The camera finds the wall switch.");
+    state.look = sw.surface();
+    let tt = 0; while (sw.visTime < 0.55 && tt < 3) { await tween(0.05, () => {}); guard(id); tt += 0.05; }
+    sw.status = "Detected";
+    log("S1", "Rocker switch found in Living room (conf 0.95) -> SW-01", C.setup);
+    toast("SW-01  Rocker switch", "Registered in Living room · conf 0.95", C.setup);
+    if (decoy.visTime > 0.2 || decoy.vis) log("S1", "Rejected: wall panel in Living room (conf 0.37 < 0.60), not an actuator", C.safety);
+    await wait(0.4, id);
+
+    // S2: map it to the lights and verify with a test pulse
+    stage(1); say("S2 · Map and verify", "SW-01  ->  Living lights");
+    log("S2", "Candidate: SW-01 -> Living lights (spatial context 0.68)", C.setup);
+    toast("Candidate mapping", "SW-01 -> Living lights", C.setup);
+    showArc(0x6ea8ff); camGlance = { p: new THREE.Vector3(1.2, 3.4, 6.6), l: new THREE.Vector3(4.6, 1.3, 2.8) };
+    await wait(0.9, id);
+    log("S2", "Register channel: Wi-Fi smart plug, sending test pulse", C.setup);
+    await wifiRings(false); guard(id);
+    await tween(0.4, (k) => setLamps(k)); guard(id);
+    await wait(1.0, id);
+    log("S2", "CV state check: lamp region delta-L +0.36 -> state ON confirmed", C.learn);
+    await tween(0.4, (k) => setLamps(1 - k)); guard(id);
+    await wait(0.6, id);
+    sw.status = "Verified";
+    log("S2", "Mapping verified: SW-01 -> Living lights (0.95)", C.learn);
+    toast("Mapping verified", "SW-01 -> Living lights · conf 0.95", C.learn);
+    hideArc(); camGlance = null;
+
+    // S3: into the routine
+    stage(2); sw.status = "In routine";
+    log("S3", "Routine active: Evening arrival turns on Living lights via SW-01", C.learn);
+    toast("Routine active", "Evening arrival · Living lights on", C.learn);
+    state.look = null; await wait(0.8, id);
+
+    // S4: the situation
+    stage(3); say("S4 · Situation", "Someone arrives home in the evening.");
+    log("S4", "Trigger: Door sensor: someone arrived home, 18:42", C.runtime);
+    toast("Trigger", "Door sensor: someone arrived home, 18:42", C.runtime);
+    await wait(1.3, id);
+    log("S4", "Intent (routine): light the living room (confidence 0.94). Risk class R1: runs without asking", C.runtime);
+    await wait(0.6, id);
+
+    // S5: wireless first, and it fails
+    stage(4); say("S5 · Wireless control", "Living lights ON");
+    log("S5", "Mapping lookup: SW-01 -> Living lights. Channels: Wi-Fi 0.66, PHYS 0.82", C.runtime);
+    showArc(0xffb84d); camGlance = { p: new THREE.Vector3(1.2, 3.4, 6.6), l: new THREE.Vector3(4.8, 1.0, 2.6) };
+    await wait(1.0, id);
+    log("S5", "Send ON via Wi-Fi (Wi-Fi smart plug)", C.runtime);
+    await wifiRings(true); guard(id);
+    counts.wFail++;
+    log("S5", "Wi-Fi: device reported an error, state unchanged", C.safety);
+    toast("Wi-Fi failed", "Device reported an error", C.safety);
+    log("S7", "Learn: SW-01  Wi-Fi  0.66 -> 0.45  (failure)", C.learn);
+    await wait(0.9, id);
+    hideArc(); camGlance = null;
+
+    // S6: Safety Guard, then go and press it
+    stage(5); say("S6 · Physical fallback", "Safety Guard, then the robot operates SW-01 itself.");
+    log("S6", "Wireless unavailable: physical fallback for SW-01", C.runtime);
+    const n = sw.normal, right = new THREE.Vector3(-1, 0, 0).applyAxisAngle(UP, Math.atan2(-n.x, -n.z));
+    const base = new THREE.Vector3(sw.g.position.x, 0, sw.g.position.z);
+    const stand = base.clone().addScaledVector(n, 0.62).addScaledVector(right, -robot.lateral);
+    if (hazard) { person.position.copy(stand).addScaledVector(right, 0.7).addScaledVector(n, -0.15); person.visible = true; }
+    const rows = ["Path to control is clear", "No person inside the " + (robot.kind === "cloid" ? "arm" : "actuator") + " zone", "Contact force limit armed", "Control located by CV"];
+    const card = safetyCard(rows);
+    for (let i = 0; i < rows.length; i++) {
+      card.els[i].className = "check run"; card.els[i].lastChild.textContent = "…";
+      await wait(0.55, id);
+      const bad = hazard && (i === 0 || i === 1);
+      card.els[i].className = "check " + (bad ? "fail" : "ok"); card.els[i].lastChild.textContent = bad ? "FAIL" : "OK";
+      if (bad) {
+        counts.cancel++;
+        log("SAFE", rows[i] + ": FAILED (person detected)", C.safety);
+        log("S6", "Cancelled by Safety Guard; resident notified", C.safety);
+        toast("Action cancelled", "SW-01: person near the control. Resident notified.", C.safety, 4);
+        say("Cancelled", "A person is in the work area, so the robot does not press. Turn the hazard off and run again.");
+        await wait(1.5, id); return finish(id);
+      }
+    }
+    log("SAFE", "Safety Guard: all checks passed", C.learn);
+    await wait(0.5, id); card.p.remove();
+    log("S6", "VLA plan: approach SW-01, stop 0.62 m from the wall", C.runtime);
+    state.look = sw.surface();
+    await driveTo(stand.x, stand.z, id);
+    await turnTo(Math.atan2(-n.x, -n.z), id);
+    await wait(0.4, id);
+    log("S6", "CV located SW-01 (0.96), pose estimated", C.runtime);
+    camMode = "close";
+    log("S6", robot.kind === "cloid" ? "Arm: reach and press" : "Actuator: carriage to 1.25 m, rod extends and presses", C.runtime);
+    const back = await robot.press(sw, true, id);
+    await tween(0.35, (k) => setLamps(k)); guard(id);
+    await wait(0.6, id);
+    cvChip = { text: "CV  ΔL +0.46  ·  Living lights ON", col: C.learn, until: clock + 3 };
+    counts.phys++;
+    log("S6", "CV state check: delta-L +0.46 -> Living lights ON confirmed", C.learn);
+    toast("Living lights ON", "Operated physically, confirmed by CV", C.learn);
+    stage(6);
+    log("S7", "Learn: SW-01  PHYS  0.82 -> 0.88  (success)", C.learn);
+    toast("Learning update", "SW-01  PHYS  0.82 -> 0.88", C.learn);
+    await back(); guard(id);
+    state.look = null; camMode = "chase";
+    finish(id);
+  } catch (e) { if (!(e instanceof Cancel)) throw e; }
+}
+function finish(id) {
+  if (id !== runId) return;
+  const p = document.createElement("div"); p.className = "panel summary";
+  p.innerHTML = "<h4><span>RUN SUMMARY</span><span>" + (clock - t0).toFixed(1) + " s</span></h4>";
+  for (const t of ["Wireless first: " + counts.wOk + " ok, " + counts.wFail + " failed", "Physical fallback: " + counts.phys + " ok", "Safety cancels: " + counts.cancel]) { const d = document.createElement("div"); d.textContent = t; p.appendChild(d); }
+  $("cards").appendChild(p);
+  if (counts.cancel === 0) say("Done", "Wi-Fi failed, so the robot pressed SW-01 itself. The camera confirmed the light is on.");
+  stage(-1); running = false; $("bRun").textContent = "Quick demo"; $("bRun").classList.remove("on");
+}
+
+// ------------------------------------------------------------------ controls
+function openStart() { resetWorld(); $("start").hidden = false; $("bStart").focus(); }
+function begin() { $("start").hidden = true; quickDemo(); }
+document.querySelectorAll(".card").forEach((c) => c.addEventListener("click", () => { useRobot(c.dataset.robot); resetWorld(); }));
+$("bStart").addEventListener("click", begin);
+$("bRun").addEventListener("click", () => { if (running) { resetWorld(); } else quickDemo(); });
+$("bRobot").addEventListener("click", openStart);
+$("bHazard").addEventListener("click", () => { hazard = !hazard; $("bHazard").classList.toggle("on", hazard); $("bHazard").setAttribute("aria-pressed", String(hazard)); });
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
+  const startOpen = !$("start").hidden;
+  if (e.key === "1" && startOpen) { useRobot("cloid"); resetWorld(); }
+  else if (e.key === "2" && startOpen) { useRobot("tracked"); resetWorld(); }
+  else if (e.key === " ") { e.preventDefault(); if (startOpen) begin(); else $("bRun").click(); }
+  else if (e.key === "h" || e.key === "H") $("bHazard").click();
+  else if (e.key === "m" || e.key === "M") openStart();
+});
+
+// ------------------------------------------------------------------ render loop (one canvas, three viewports)
+function viewport(el, cam) {
+  const r = el.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return;
+  const x = r.left - cr.left, y = cr.bottom - r.bottom;
+  renderer.setViewport(x, y, r.width, r.height); renderer.setScissor(x, y, r.width, r.height);
+  if (cam.isPerspectiveCamera) { cam.aspect = r.width / r.height; cam.updateProjectionMatrix(); }
+  renderer.render(scene, cam);
+}
+function resize() {
+  const narrow = matchMedia("(max-width: 820px)").matches;
+  const w = narrow ? document.documentElement.clientWidth : innerWidth, h = narrow ? document.getElementById("app").scrollHeight : innerHeight;
+  canvas.style.height = h + "px"; renderer.setSize(w, h, false);
+}
+addEventListener("resize", resize); resize();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  stepTweens(dt);
+  updateCams(dt);
+  perceive(dt);
+  renderer.setScissorTest(false);
+  renderer.setClearColor(0x0d141a); renderer.clear();
+  renderer.setScissorTest(true);
+  viewport($("view3p"), cam3p);
+  marker.visible = true; viewport($("viewMap"), camMap);
+  viewport($("viewFp"), camFp);
+  drawFp(); drawTags();
+  requestAnimationFrame(frame);
+}
+
+let saved = null; try { saved = localStorage.getItem("webdemo-robot"); } catch (e) {}
+scene.add(robot.root); useRobot(saved === "cloid" ? "cloid" : "tracked");
+resetWorld();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

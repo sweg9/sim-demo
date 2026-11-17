@@ -21,6 +21,7 @@ Unity simulator demo of a camera-equipped home robot that recognizes wall switch
 - Two robot models (`Assets/Scripts/RobotRig.cs`): **CLOiD** is the original life-like robot with two arms. **Robot arm demo** (`tracked`) is a tracked base with a vertical rail; a carriage on the rail holds the webcam and a piston actuator that presses straight ahead. The start screen asks which one to run (the choice is remembered); M returns to it. Player builds also take `-robot tracked|cloid`.
 - Editor menu `CLOiD > Setup project` regenerates materials and the scene.
 - Quick demo: one switch (SW-01) is recognised and mapped to the living-room light, an evening-arrival trigger fires, the Wi-Fi plug fails, and the robot presses the switch itself and confirms the light by CV. Player builds take `-quickdemo`.
+- Web demo for presentations: open `web/index.html` in a browser (no Unity needed; three.js loads from jsDelivr, so it needs internet). It runs the same quick demo with either robot; H puts a person near the switch to show the Safety Guard cancel.
 - Headless builds: `-executeMethod Setup.Build` (macOS) and `Setup.BuildWin` (Windows) write to `Builds/`.
 
 ## Controls
