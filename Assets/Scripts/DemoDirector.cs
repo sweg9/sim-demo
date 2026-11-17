@@ -720,7 +720,7 @@ public class DemoDirector : MonoBehaviour
         ToastMsg("Trigger", r.trigger, Amber, 3.2f);
         Shot("s4_trigger");
         yield return W(2.0f);
-        Log("S4", "Intent (cloud VLM): " + r.intent, Amber);
+        Log("S4", "Intent (routine): " + r.intent, Amber);
         yield return W(1.6f);
         Log("S4", "Risk class R1 (lighting): runs without asking", Amber);
         yield return W(1.0f);
