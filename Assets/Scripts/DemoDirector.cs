@@ -876,6 +876,7 @@ public class DemoDirector : MonoBehaviour
                     ToastMsg(ch.name + " failed", "Device reported an error", Red, 2.8f);
                 }
                 Sfx.Play("fail");
+                Shot("s5_fail_" + cp.id);
                 Learn(cp, ch, false);
                 yield return W(0.9f);
                 continue;
@@ -981,7 +982,7 @@ public class DemoDirector : MonoBehaviour
             }
             Sfx.Play("tick");
         }
-        if (!safetyAborted) Log("SAFE", "Safety Guard: all checks passed", Green);
+        if (!safetyAborted) { Log("SAFE", "Safety Guard: all checks passed", Green); Shot("s6_safety_" + cp.id); }
         yield return W(0.5f);
         safetyOpen = false;
     }
