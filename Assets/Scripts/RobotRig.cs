@@ -46,6 +46,7 @@ public class RobotRig : MonoBehaviour
     public float maxSpeed = 1.15f, accel = 1.5f, maxTurn = 150f;
     public float speed;
     public bool busy;
+    public float toolPace = 1f;      // scales rail / piston motion time (the quick demo runs faster)
 
     Arm right, left;                 // left is null on the tracked body
     Track trackL, trackR;
@@ -332,6 +333,7 @@ public class RobotRig : MonoBehaviour
 
     IEnumerator MoveTool(float carTo, float extTo, float dur)
     {
+        dur *= toolPace;
         carTo = Mathf.Clamp(carTo, CarMin, CarMax);
         extTo = Mathf.Clamp(extTo, RodMin, RodMax);
         float c0 = carY, e0 = rodExt, t = 0;

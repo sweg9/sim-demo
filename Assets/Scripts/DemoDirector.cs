@@ -68,6 +68,8 @@ public class DemoDirector : MonoBehaviour
     public string shotDir;
     public bool quitAfter;
     public float speed = 1f;
+    public float pace = 1f;                 // scales scripted waits (the quick demo runs faster)
+    ControlPoint perceiveOnly;              // when set, only this control can be registered
 
     Coroutine mission;
     readonly Queue<ControlPoint> verifyQueue = new Queue<ControlPoint>();
@@ -202,7 +204,7 @@ public class DemoDirector : MonoBehaviour
 
     public void FinishStage(int i) { stageState[i] = 2; }
 
-    IEnumerator W(float s) { yield return new WaitForSeconds(s); }
+    IEnumerator W(float s) { yield return new WaitForSeconds(s * pace); }
 
     public void Shot(string name)
     {
@@ -269,7 +271,7 @@ public class DemoDirector : MonoBehaviour
             }
             bool strong = vis && cp.visConf >= (cp.IsDecoy ? 0.3f : 0.80f);
             cp.visTime = strong ? cp.visTime + dt : Mathf.Max(0, cp.visTime - dt * 1.5f);
-            if (cp.status == CtrlStatus.Unseen && cp.visTime >= (cp.IsDecoy ? 1.2f : 0.55f)) Register(cp);
+            if (cp.status == CtrlStatus.Unseen && cp.visTime >= (cp.IsDecoy ? 1.2f : 0.55f) && (perceiveOnly == null || perceiveOnly == cp)) Register(cp);
         }
     }
 
@@ -302,14 +304,16 @@ public class DemoDirector : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1) || Input.GetKeyDown(KeyCode.LeftArrow)) ChooseRobot(RobotModel.Cloid);
             if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2) || Input.GetKeyDown(KeyCode.RightArrow)) ChooseRobot(RobotModel.Tracked);
         }
-        if (introVisible && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
+        if (introVisible && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.L)))
         {
             introVisible = false;
-            if (Input.GetKeyDown(KeyCode.Space)) StartAuto();
+            if (Input.GetKeyDown(KeyCode.Space)) StartQuick();
+            else if (Input.GetKeyDown(KeyCode.L)) StartAuto();
             return;
         }
         if (Input.GetKeyDown(KeyCode.Escape) && missionRunning) CancelMission("Cancelled by user");
-        if (Input.GetKeyDown(KeyCode.Space) && !introVisible) { if (missionRunning && auto) CancelMission("Auto demo stopped"); else StartAuto(); }
+        if (Input.GetKeyDown(KeyCode.Space) && !introVisible) { if (missionRunning && auto) CancelMission("Demo stopped"); else StartQuick(); }
+        if (Input.GetKeyDown(KeyCode.L) && !introVisible && !missionRunning) StartAuto();
         if (Input.GetKeyDown(KeyCode.R) && !missionRunning) RunRoutineKey("evening");
         if (Input.GetKeyDown(KeyCode.G) && !missionRunning) RunRoutineKey("goodnight");
         if (Input.GetKeyDown(KeyCode.H)) { hazard = !hazard; Log("SAFE", hazard ? "Hazard injected: a person stands near the switch" : "Hazard cleared", hazard ? Red : Green); }
@@ -423,6 +427,16 @@ public class DemoDirector : MonoBehaviour
         StartMission("Auto demo", AutoDemo());
     }
 
+    /// <summary>The 30-second demo: map one switch, a situation fires, Wi-Fi fails, the robot presses it and CV confirms.</summary>
+    public void StartQuick()
+    {
+        if (missionRunning) return;
+        introVisible = false;
+        ResetWorld();
+        auto = true;
+        StartMission("Quick demo", QuickDemo());
+    }
+
     public void RunRoutineKey(string key)
     {
         if (missionRunning) return;
@@ -435,6 +449,7 @@ public class DemoDirector : MonoBehaviour
     {
         if (mission != null) { StopCoroutine(mission); mission = null; }
         missionRunning = false; auto = false; finished = false; endCard = false;
+        pace = 1f; perceiveOnly = null; robot.toolPace = 1f;
         verifyQueue.Clear();
         foreach (var cp in house.controls)
         {
@@ -493,6 +508,68 @@ public class DemoDirector : MonoBehaviour
         Say("Demo complete", "SPACE replays   WASD or click the floor to drive   R runs the routine again   G goodnight");
         Shot("99_end");
         yield return W(1.5f);
+        if (quitAfter) Bootstrap.QuitApp();
+    }
+
+    IEnumerator QuickDemo()
+    {
+        var cp = Cp("SW-01");               // living-room rocker: its Wi-Fi plug fails, so the robot must press it
+        var r = routines["evening"];
+        pace = 0.75f;
+        robot.toolPace = 0.85f;
+        perceiveOnly = cp;
+
+        // start in the living room, 1.5 m from the switch
+        Vector3 start = cp.transform.position + cp.Normal * 1.5f; start.y = 0;
+        robot.Teleport(start, Quaternion.LookRotation(-cp.Normal).eulerAngles.y);
+        cam.SetMode(CamMode.Chase);
+        Shot("q00_start");
+        Say("Quick demo  ·  " + robot.Title, "Learn a switch, then keep the routine working when Wi-Fi fails.");
+        yield return W(1.0f);
+
+        // 1. mapping: recognise the switch and learn which light it drives
+        Say("S1 · Recognize", "The camera finds the wall switch.");
+        SetStage(0);
+        robot.SetMood(Cyan, 0.6f);
+        robot.LookAt(cp.Surface);
+        float t = 0;
+        while (cp.status == CtrlStatus.Unseen && t < 3f) { t += Time.deltaTime; yield return null; }
+        if (cp.status == CtrlStatus.Unseen) Register(cp);   // never stall the demo
+        verifyQueue.Clear();
+        yield return W(0.4f);
+        yield return VerifyMapping(cp, true);
+        FinishStage(0); FinishStage(1);
+        SetStage(2);
+        cp.status = CtrlStatus.InRoutine;
+        Log("S3", "Routine active: " + r.name + " turns on " + cp.lampName + " via " + cp.id, Green);
+        ToastMsg("Routine active", r.name + "  ·  " + cp.lampName + " on", Green, 2.2f);
+        FinishStage(2);
+        robot.LookForward();
+        yield return W(0.8f);
+
+        // 2. the situation: someone comes home
+        SetStage(3);
+        for (int i = 4; i < 7; i++) stageState[i] = 0;
+        routineText = r.name;
+        Say("S4 · Situation", "Someone arrives home in the evening.");
+        robot.SetMood(Amber, 0.5f);
+        Log("S4", "Trigger: " + r.trigger, Amber);
+        ToastMsg("Trigger", r.trigger, Amber, 2.4f);
+        Shot("q04_trigger");
+        yield return W(1.3f);
+        Log("S4", "Intent (routine): light the living room (confidence 0.94). Risk class R1: runs without asking", Amber);
+        FinishStage(3);
+        yield return W(0.6f);
+
+        // 3. Wi-Fi fails -> the robot presses the switch -> CV confirms the light is on
+        yield return RunAction(cp, true);
+        FinishStage(5); SetStage(6); FinishStage(6);
+        finished = true; endCard = true;
+        Say("Done", "Wi-Fi failed, so the robot pressed " + cp.id + " itself. The camera confirmed the light is on.");
+        Shot("q99_end");
+        pace = 1f; robot.toolPace = 1f;
+        yield return W(1.5f);
+        perceiveOnly = null;
         if (quitAfter) Bootstrap.QuitApp();
     }
 
@@ -849,7 +926,7 @@ public class DemoDirector : MonoBehaviour
         yield return robot.TurnTo(yaw);
         robot.LookAt(cp.Surface);
         float wait = 0;
-        while ((!cp.visibleNow || cp.visConf < 0.82f) && wait < 2.5f) { wait += Time.deltaTime; yield return null; }
+        while ((!cp.visibleNow || cp.visConf < 0.82f) && wait < 2.5f * pace) { wait += Time.deltaTime; yield return null; }
         Log("S6", "CV located " + cp.id + " (" + Mathf.Max(0.88f, cp.visConf).ToString("0.00") + "), pose estimated", Amber);
         yield return W(0.5f);
         cam.CloseUp(cp.transform.position);

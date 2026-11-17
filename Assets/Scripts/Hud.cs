@@ -252,8 +252,8 @@ public class Hud : MonoBehaviour
         // buttons
         y += 62;
         float bw = 76, bh = 30;
-        if (Btn(new Rect(x, y, 98, bh), d.missionRunning && d.auto ? "Stop" : "Auto demo", DemoDirector.Cyan, d.auto && d.missionRunning))
-        { if (d.missionRunning && d.auto) d.CancelMission("Auto demo stopped"); else if (!d.missionRunning) d.StartAuto(); }
+        if (Btn(new Rect(x, y, 98, bh), d.missionRunning && d.auto ? "Stop" : "Quick demo", DemoDirector.Cyan, d.auto && d.missionRunning))
+        { if (d.missionRunning && d.auto) d.CancelMission("Demo stopped"); else if (!d.missionRunning) d.StartQuick(); }
         if (Btn(new Rect(x + 104, y, bw + 8, bh), "Routine", DemoDirector.Amber)) { if (!d.missionRunning) d.RunRoutineKey("evening"); }
         if (Btn(new Rect(x + 104 + bw + 14, y, bw + 18, bh), "Goodnight", DemoDirector.Amber)) { if (!d.missionRunning) d.RunRoutineKey("goodnight"); }
         if (Btn(new Rect(x + 104 + bw + bw + 40, y, 48, bh), "Reset", DemoDirector.Mute)) d.ResetWorld();
@@ -579,7 +579,7 @@ public class Hud : MonoBehaviour
 
     void Hints()
     {
-        string s = "WASD / click to drive   Right-drag orbit   C camera   SPACE auto   R routine   G goodnight   H hazard   M robot   T reset";
+        string s = "WASD / click to drive   Right-drag orbit   C camera   SPACE quick demo   L full demo   R routine   H hazard   M robot   T reset";
         float cx = (W - 540 - 370) * 0.5f + 370;
         Rect r = new Rect(cx - 460, Hh - 50, 920, 24);
         T(r, s, 12, new Color(1, 1, 1, 0.55f), TextAnchor.MiddleCenter, true);
@@ -643,9 +643,10 @@ public class Hud : MonoBehaviour
             new[] { "Two tracks, one motor per track", "Carriage rides a vertical rail to switch height", "Piston rod extends straight ahead to press" });
 
         float by = top + ch + 30;
-        if (Btn(new Rect(cx - 190, by, 180, 48), "Start auto demo", DemoDirector.Cyan, true)) { d.introVisible = false; d.StartAuto(); }
-        if (Btn(new Rect(cx + 10, by, 180, 48), "Drive manually", DemoDirector.Mute)) d.introVisible = false;
-        T(new Rect(cx - 400, by + 64, 800, 24), "1 / 2 choose robot     SPACE auto demo     ENTER drive manually     M back to this screen", 13, new Color(1, 1, 1, 0.5f), TextAnchor.MiddleCenter, true);
+        if (Btn(new Rect(cx - 290, by, 180, 48), "Quick demo  ·  30 s", DemoDirector.Cyan, true)) { d.introVisible = false; d.StartQuick(); }
+        if (Btn(new Rect(cx - 90, by, 180, 48), "Full demo", DemoDirector.Blue)) { d.introVisible = false; d.StartAuto(); }
+        if (Btn(new Rect(cx + 110, by, 180, 48), "Drive manually", DemoDirector.Mute)) d.introVisible = false;
+        T(new Rect(cx - 450, by + 64, 900, 24), "1 / 2 choose robot     SPACE quick demo     L full demo     ENTER drive manually     M back to this screen", 13, new Color(1, 1, 1, 0.5f), TextAnchor.MiddleCenter, true);
     }
 
     void RobotCard(Rect r, RobotModel m, string key, string[] lines)

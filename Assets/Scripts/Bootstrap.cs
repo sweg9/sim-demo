@@ -166,6 +166,7 @@ public class Bootstrap : MonoBehaviour
         if (Flag("-skipintro")) dir.introVisible = false;
         viewTest = Flag("-viewtest");
         if (Flag("-autodemo")) { dir.introVisible = false; dir.StartAuto(); }
+        if (Flag("-quickdemo")) { dir.introVisible = false; dir.StartQuick(); }
         if (viewTest) StartCoroutine(ViewTest());
         if (Flag("-introshot") && shotDir != null) StartCoroutine(IntroShot());
     }

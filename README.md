@@ -20,6 +20,7 @@ Unity simulator demo of a camera-equipped home robot that recognizes wall switch
 - Open the project and press Play. The scene builds itself at runtime (`Assets/Scripts/Bootstrap.cs`).
 - Two robot models (`Assets/Scripts/RobotRig.cs`): **CLOiD** is the original life-like robot with two arms. **Robot arm demo** (`tracked`) is a tracked base with a vertical rail; a carriage on the rail holds the webcam and a piston actuator that presses straight ahead. The start screen asks which one to run (the choice is remembered); M returns to it. Player builds also take `-robot tracked|cloid`.
 - Editor menu `CLOiD > Setup project` regenerates materials and the scene.
+- Quick demo: one switch (SW-01) is recognised and mapped to the living-room light, an evening-arrival trigger fires, the Wi-Fi plug fails, and the robot presses the switch itself and confirms the light by CV. Player builds take `-quickdemo`.
 - Headless builds: `-executeMethod Setup.Build` (macOS) and `Setup.BuildWin` (Windows) write to `Builds/`.
 
 ## Controls
@@ -28,7 +29,8 @@ Unity simulator demo of a camera-equipped home robot that recognizes wall switch
 |---|---|
 | W A S D / arrows | Drive the robot (Shift to run) |
 | Click on the floor | Walk there with A* path finding |
-| Space | Start or stop the auto demo |
+| Space | Start or stop the quick demo (about 25 s) |
+| L | Start the full demo (about 4 min) |
 | R / G | Run the evening / goodnight routine |
 | H | Inject a hazard (a person near the switch) |
 | C / F / V | Cycle camera / overview / robot POV |

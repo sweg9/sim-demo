@@ -98,9 +98,20 @@ public class CamRig : MonoBehaviour
             case CamMode.Close:
             {
                 Vector3 f = robot.transform.forward, r = robot.transform.right;
-                dPos = rp - f * 0.95f + r * 0.95f + Vector3.up * 1.55f;
-                dRot = Quaternion.LookRotation(closePoint - dPos, Vector3.up);
-                dFov = 38f;
+                if (robot.model == RobotModel.Tracked)
+                {
+                    // from the side: carriage, rod and switch in one frame
+                    dPos = rp + r * 1.35f + f * 0.15f + Vector3.up * 1.45f;
+                    Vector3 look = Vector3.Lerp(rp + Vector3.up * closePoint.y, closePoint, 0.55f);
+                    dRot = Quaternion.LookRotation(look - dPos, Vector3.up);
+                    dFov = 44f;
+                }
+                else
+                {
+                    dPos = rp - f * 0.95f + r * 0.95f + Vector3.up * 1.55f;
+                    dRot = Quaternion.LookRotation(closePoint - dPos, Vector3.up);
+                    dFov = 38f;
+                }
                 break;
             }
             case CamMode.Overview:
